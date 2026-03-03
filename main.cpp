@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 15:51:36 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/02 17:30:53 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/03 12:37:55 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,10 +29,9 @@ volatile sig_atomic_t g_running = 1;
 
 void sigint_handler(int signal)
 {
-    (void)signal; // ignorar parámetro
-    g_running = 0; // avisar al main loop que debe salir
+	(void)signal; // ignorar parámetro
+	g_running = 0; // avisar al main loop que debe salir
 }
-
 
 /*esta funcion hace que el socket no sea blocante, es decir que el primer cliente
 bloquearia a los siguientes si no envia nada y los siguientes se quieren conectar o mandar algo*/
@@ -69,7 +68,6 @@ int main(int argc, char **argv)
 	// guardar contraseña
 	std::string server_password = argv[2];
 
-	
 	// Crear socket servidor que es el que escucha
 	int server_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET=IPV4, SOCK_STREAM=TCP, 0=protocolo por defecto
 	if (server_fd == -1)
@@ -141,11 +139,13 @@ int main(int argc, char **argv)
 	const size_t BUF_SIZE = 512;
 	char buf[BUF_SIZE]; //buffer para almacenar el mensaje que envias
 
-	while (true)
+	while (g_running)
 	{
 		int ret = poll(&fds[0], fds.size(), -1); // espera que haya algun evento en un cliente o en el servidor
 		if (ret == -1)
 		{
+			if (errno == EINTR)
+				continue;
 			std::cerr << "ERROR: poll falló\n";
 			break;
 		}
@@ -162,10 +162,9 @@ int main(int argc, char **argv)
 			{
 				if (fds[i].fd == server_fd)
 				{
-					// en caso crítico cerramos todo
 					std::cerr << "ERROR en server_fd (poll)\n";
-					close(server_fd);
-					return 1;
+					g_running = 0;
+					break;
 				}
 				else
 				{
@@ -194,10 +193,11 @@ int main(int argc, char **argv)
 					if (client_fd == -1)
 					{
 						if (errno == EAGAIN || errno == EWOULDBLOCK)
-							break; // no hay más conexiones pendientes
+							break;  // no hay más conexiones pendientes
 						std::cerr << "ERROR en accept nuevo cliente\n";
 						break;
 					}
+					
 					// opcional: poner non-blocking al cliente
 					if (set_nonblock(client_fd) == -1)
 						std::cerr << "WARNING: no se pudo poner client_fd non-blocking\n";
@@ -233,92 +233,97 @@ int main(int argc, char **argv)
 			if (fds[i].revents & POLLIN)
 			{
 				int clientFd = fds[i].fd;
-				ssize_t n = recv(clientFd, buf, BUF_SIZE, 0); //la cantidad de bytes que ha enviado el cliente al servidor
-				if (n == -1) //ERROR al recibir los datos
+
+				while (true)
 				{
-					std::cerr << "ERROR: recv falló en fd " << clientFd << "\n";
-					// cerramos y limpiamos
-					close(clientFd);
-					accum.erase(clientFd);
-					outbuf.erase(clientFd);
-					fds.erase(fds.begin() + i);
-					--i;
-					continue;
-				}
-				if (n == 0)	// cliente cerró conexión
-				{
-					std::cout << "Cliente (fd " << clientFd << ") cerró conexión\n";
-					close(clientFd);
-					accum.erase(clientFd);
-					outbuf.erase(clientFd);
-					fds.erase(fds.begin() + i);
-					--i;
-					continue;
-				}
+					ssize_t n = recv(clientFd, buf, BUF_SIZE, 0); //la cantidad de bytes que ha enviado el cliente al servidor
 
-				// añadir a acumulador
-				accum[clientFd].append(buf, buf + n);
-
-				// procesar líneas completas
-				size_t pos;
-				while ((pos = accum[clientFd].find('\n')) != std::string::npos)
-				{
-					std::string line = accum[clientFd].substr(0, pos);
-					if (!line.empty() && line[line.size() - 1] == '\r')
-						line.erase(line.size() - 1);
-
-					// log en servidor
-					std::cout << "fd " << clientFd << " -> Línea recibida: [" << line << "]\n";
-
-					if (!correctPass[clientFd])
+					if (n > 0)
 					{
-						// esperamos "PASS <password>"
-						if (line.compare(0, 5, "PASS ") == 0)
+						// añadir a acumulador
+						accum[clientFd].append(buf, buf + n);
+
+						// procesar líneas completas
+						size_t pos;
+						while ((pos = accum[clientFd].find('\n')) != std::string::npos)
 						{
-							std::string given = line.substr(5);
-							if (given == server_password)
+							std::string line = accum[clientFd].substr(0, pos);
+							if (!line.empty() && line[line.size() - 1] == '\r')
+								line.erase(line.size() - 1);
+
+							std::cout << "fd " << clientFd << " -> Línea recibida: [" << line << "]\n";
+
+							if (!correctPass[clientFd])
 							{
-								correctPass[clientFd] = true;
-								// confirmar (se encola para enviar correctamente con POLLOUT)
-								outbuf[clientFd] += "PASS accepted\r\n";
-								fds[i].events |= POLLOUT;
-								std::cout << "fd " << clientFd << " autenticado correctamente\n";
+								// esperamos "PASS <password>"
+								if (line.compare(0, 5, "PASS ") == 0)
+								{
+									std::string given = line.substr(5);
+									if (given == server_password)
+									{
+										correctPass[clientFd] = true;
+										outbuf[clientFd] += "PASS accepted\r\n";
+										fds[i].events |= POLLOUT;
+										std::cout << "fd " << clientFd << " autenticado correctamente\n";
+									}
+									else
+									{
+										std::cout << "fd " << clientFd << " fallo autenticacion. Cerrando.\n";
+										close(clientFd);
+										accum.erase(clientFd);
+										outbuf.erase(clientFd);
+										correctPass.erase(clientFd);
+										fds.erase(fds.begin() + i);
+										--i;
+										break;
+									}
+								}
+								else
+								{
+									std::cout << "fd " << clientFd << " no envió PASS primero. Cerrando.\n";
+									close(clientFd);
+									accum.erase(clientFd);
+									outbuf.erase(clientFd);
+									correctPass.erase(clientFd);
+									fds.erase(fds.begin() + i);
+									--i;
+									break;
+								}
 							}
 							else
 							{
-								std::cout << "fd " << clientFd << " fallo autenticacion (PASS incorrecto). Cerrando.\n";
-								// cerramos sin mandar respuesta para no escribir sin poll
-								close(clientFd);
-								accum.erase(clientFd);
-								outbuf.erase(clientFd);
-								correctPass.erase(clientFd);
-								fds.erase(fds.begin() + i);
-								--i;
-								continue;
+								outbuf[clientFd] += "Servidor dice: hola\r\n";
+								fds[i].events |= POLLOUT;
 							}
-						}
-						else
-						{
-							// no envió PASS primero => cerrar (el subject exige password)
-							std::cout << "fd " << clientFd << " no envió PASS primero. Cerrando.\n";
-							close(clientFd);
-							accum.erase(clientFd);
-							outbuf.erase(clientFd);
-							correctPass.erase(clientFd);
-							fds.erase(fds.begin() + i);
-							--i;
-							continue;
-						}
-					}
-					else
-					{
-						// comportamiento actual: preparar respuesta simple
-						outbuf[clientFd] += "Servidor dice: hola\r\n";
-						fds[i].events |= POLLOUT;
-					}
 
-					// borrar línea procesada (incluye '\n')
-					accum[clientFd].erase(0, pos + 1);
+							accum[clientFd].erase(0, pos + 1);
+						}
+					}
+					else if (n == 0) 	// cliente cerró conexión
+					{
+						std::cout << "Cliente (fd " << clientFd << ") cerró conexión\n";
+						close(clientFd);
+						accum.erase(clientFd);
+						outbuf.erase(clientFd);
+						correctPass.erase(clientFd);
+						fds.erase(fds.begin() + i);
+						--i;
+						break;
+					}
+					else //ERROR al recibir los datos
+					{
+						if (errno == EAGAIN || errno == EWOULDBLOCK)
+							break;
+						std::cerr << "ERROR: recv falló\n";
+						// cerramos y limpiamos
+						close(clientFd);
+						accum.erase(clientFd);
+						outbuf.erase(clientFd);
+						correctPass.erase(clientFd);
+						fds.erase(fds.begin() + i);
+						--i;
+						break;
+					}
 				}
 			}
 
@@ -328,15 +333,29 @@ int main(int argc, char **argv)
 				int fd = fds[i].fd;
 				std::string &data = outbuf[fd];
 
-				if (!data.empty())
+				while (!data.empty())
 				{
 					ssize_t sent = send(fd, data.c_str(), data.size(), 0);
+
 					if (sent > 0)
 						data.erase(0, sent);
+					else if (sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+						break;
+					else
+					{
+						std::cerr << "ERROR: send falló\n";
+						close(fd);
+						accum.erase(fd);
+						outbuf.erase(fd);
+						correctPass.erase(fd);
+						fds.erase(fds.begin() + i);
+						--i;
+						break;
+					}
 				}
 
-				if (data.empty())
-					fds[i].events &= ~POLLOUT;
+				if (outbuf.find(fd) != outbuf.end() && outbuf[fd].empty()) /*Si ya terminé de enviar todo al cliente, deja de preguntarle al sistema si puedo escribir*/
+					fds[i].events &= ~POLLOUT; /*esta linea=Deja de vigilar escritura para este socket y la ~ es para invertir todos los bits de POLLOUT*/
 			}
 		} // fin for fds
 	} // fin while poll
@@ -344,5 +363,6 @@ int main(int argc, char **argv)
 	// limpieza (no debería llegar aquí normalmente)
 	for (size_t j = 0; j < fds.size(); ++j)
 		close(fds[j].fd);
+
 	return 0;
 }
