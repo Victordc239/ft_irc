@@ -6,15 +6,18 @@
 #    By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/12/02 11:18:27 by victor            #+#    #+#              #
-#    Updated: 2026/02/26 15:52:39 by vdiez-cu         ###   ########.fr        #
+#    Updated: 2026/03/04 14:43:53 by vdiez-cu         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
 NAME		= ircserv
 
 SRCS		= main.cpp \
+			Server.cpp \
+			Client.cpp
 
-HEADERS	= 
+HEADERS	= Client.hpp \
+			Server.hpp
 
 OBJS		= $(SRCS:.cpp=.o)
 
