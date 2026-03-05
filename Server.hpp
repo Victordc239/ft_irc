@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/05 11:06:35 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/05 16:08:42 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,6 +19,13 @@
 #include <poll.h>
 #include <netinet/in.h>
 #include <csignal>
+#include <iostream>
+#include <cstring>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <cerrno>
+#include <sys/socket.h>
 #include "Client.hpp"
 #include "Channel.hpp"
 
@@ -35,11 +42,14 @@ class Server
 		std::map<int, Client> _clients;
 		std::map<std::string, Channel> _channels;
 
-		bool nick_in_use(const std::string &nick) const;
-		void send_numeric(int fd, const std::string &msg);
+		bool	nick_in_use(const std::string &nick) const;
+		void	send_numeric(int fd, const std::string &msg);
 		bool	handle_initial_authentication(size_t &i, const std::string &line);
 		void	handle_nick_command(int clientFd, const std::string &line);
 		void	handle_user_command(int clientFd, const std::string &line);
+		void	handle_join_command(int clientFd, const std::string &line);
+		int	get_fd_by_nick(const std::string &nick) const;
+		void	handle_privmsg_command(int clientFd, const std::string &line);
 
 	public:
 		Server();
@@ -47,9 +57,10 @@ class Server
 		Server &operator=(const Server &other);
 		~Server();
 
-		bool init_and_listen(long port, const std::string &password);
-		int set_nonblock(int fd);
-		int run_loop();
+		std::string	intToString(int n);
+		bool	init_and_listen(long port, const std::string &password);
+		int	set_nonblock(int fd);
+		int	run_loop();
 };
 
 #endif

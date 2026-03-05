@@ -3,21 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Channel.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:48 by victor            #+#    #+#             */
-/*   Updated: 2026/03/05 11:09:13 by victor           ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   Channel.hpp                                        :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/03/05                                  #+#    #+#         */
+/*   Updated: 2026/03/05 15:59:25 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,8 +20,8 @@ class Channel
 {
 	public:
 		std::string name;
-		std::set<int> clients; // fds de clientes dentro del canal
-		int operator_fd;       // operador del canal
+		std::set<int> clients;	// fds de clientes dentro del canal
+		int operator_fd;		// operador del canal
 
 		Channel();
 		Channel(const std::string &channel_name);

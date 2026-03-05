@@ -3,22 +3,31 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/05 11:28:24 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/05 16:08:27 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
-#include <iostream>
-#include <cstring>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <cerrno>
-#include <csignal>
-#include <sys/socket.h>
+
+std::string Server::intToString(int n)
+{
+    if (n == 0)
+        return "0";
+
+    std::string result;
+
+    while (n > 0)
+    {
+        char digit = '0' + (n % 10);
+        result.insert(result.begin(), digit);
+        n /= 10;
+    }
+
+    return result;
+}
 
 bool Server::nick_in_use(const std::string &nick) const
 {
@@ -30,18 +39,44 @@ bool Server::nick_in_use(const std::string &nick) const
 	return false;
 }
 
+int Server::get_fd_by_nick(const std::string &nick) const
+{
+	for (std::map<int, Client>::const_iterator it = this->_clients.begin(); it != this->_clients.end(); ++it)
+	{
+		if (it->second.nickname == nick)
+			return it->first;
+	}
+	return -1;
+}
+
 // helper para enviar mensajes numéricos o líneas
 void Server::send_numeric(int fd, const std::string &msg)
 {
+	// Si el fd no está en la tabla de clientes, no hacemos nada.
 	if (this->_clients.find(fd) == this->_clients.end())
+	{
+		std::cout << "DEBUG send_numeric: fd " << fd << " no existe en _clients. Mensaje descartado: [" << msg << "]\n";
 		return;
-	this->_clients[fd].outbuf += msg + "\r\n";
-	// marcar POLLOUT: buscar en _fds y añadir POLLOUT a ese fd
-	for (size_t j = 0; j < this->_fds.size(); ++j)
-		if (this->_fds[j].fd == fd)
-			this->_fds[j].events |= POLLOUT;
-}
+	}
 
+	// Añadimos CRLF según protocolo
+	this->_clients[fd].outbuf += msg + "\r\n";
+
+	// marcar POLLOUT: buscar en _fds y añadir POLLOUT a ese fd
+	bool found = false;
+	for (size_t j = 0; j < this->_fds.size(); ++j)
+	{
+		if (this->_fds[j].fd == fd)
+		{
+			this->_fds[j].events |= POLLOUT;
+			found = true;
+			std::cout << "DEBUG send_numeric: marcado POLLOUT para fd " << fd << " (msg: [" << msg << "])\n";
+			break;
+		}
+	}
+	if (!found)
+		std::cout << "DEBUG send_numeric: no existe pollfd para fd " << fd << " (msg: [" << msg << "])\n";
+}
 
 
 Server::Server()
@@ -163,106 +198,6 @@ bool Server::init_and_listen(long port, const std::string &password)
 	this->_fds.push_back(pfd);
 
 	return true;
-}
-
-/* ===========================================================
-   FASE INICIAL DE AUTENTICACIÓN
-   Ahora NO cerramos conexión si el orden es incorrecto.
-   Permitimos PASS en cualquier momento antes del registro.
-   Si es incorrecto enviamos 464 pero NO cerramos.
-   CAP se ignora.
-   =========================================================== */
-bool Server::handle_initial_authentication(size_t &i, const std::string &line)
-{
-	int clientFd = this->_fds[i].fd;
-
-	if (line.compare(0, 5, "PASS ") == 0)
-	{
-		std::string given = line.substr(5);
-
-		if (given == this->_serverPassword)
-		{
-			this->_clients[clientFd].correctPass = true;
-			std::cout << "fd " << clientFd << " PASS correcto\n";
-		}
-		else
-		{
-			// ERR_PASSWDMISMATCH 464
-			send_numeric(clientFd, "464 :Password incorrect");
-			std::cout << "fd " << clientFd << " PASS incorrecto\n";
-		}
-	}
-	else if (line.compare(0, 4, "CAP ") == 0)
-	{
-		// ignoramos negociación CAP
-		send_numeric(clientFd, "CAP * LS :");
-		std::cout << "fd " << clientFd << " CAP recibido (ignorando)\n";
-	}
-
-	// NO cerramos nunca aquí
-	return false;
-}
-void Server::handle_nick_command(int clientFd, const std::string &line)
-{
-	std::string newnick = line.substr(5);
-
-	// limpiar espacios, CR ya eliminado arriba
-	if (newnick.empty())
-	{
-		// ERR_NONICKNAMEGIVEN 431 (no usar send() directo)
-		send_numeric(clientFd, "431 :No nickname given");
-	}
-	else if (nick_in_use(newnick))
-	{
-		// ERR_NICKNAMEINUSE 433 <nick> :Nickname is already in use
-		std::string err = "433 " + newnick + " :Nickname is already in use";
-		send_numeric(clientFd, err);
-	}
-	else
-	{
-		this->_clients[clientFd].nickname = newnick;
-		std::cout << "fd " << clientFd << " set NICK=" << newnick << "\n";
-	}
-}
-
-void Server::handle_user_command(int clientFd, const std::string &line)
-{
-	// FORMATO: USER <user> <mode> <unused> :<realname>
-	std::string rest = line.substr(5);
-	std::string user;
-	std::string realname;
-
-	size_t posColon = rest.find(" :");
-
-	if (posColon != std::string::npos)
-	{
-		realname = rest.substr(posColon + 2);
-		user = rest.substr(0, posColon);
-
-		size_t sp = user.find(' ');
-		if (sp != std::string::npos)
-			user = user.substr(0, sp);
-	}
-	else
-	{
-		size_t sp = rest.find(' ');
-		if (sp == std::string::npos)
-			user = rest;
-		else
-			user = rest.substr(0, sp);
-	}
-
-	if (!user.empty())
-	{
-		this->_clients[clientFd].username = user;
-		this->_clients[clientFd].realname = realname;
-		std::cout << "fd " << clientFd << " set USER=" << user << " REAL=" << realname << "\n";
-	}
-	else
-	{
-		// ERR_NEEDMOREPARAMS 461 (usar send_numeric en vez de send directo)
-		send_numeric(clientFd, "461 USER :Not enough parameters");
-	}
 }
 
 int Server::run_loop()
@@ -412,11 +347,16 @@ int Server::run_loop()
 								send_numeric(clientFd, "PONG " + ping_target);
 								std::cout << "fd " << clientFd << " -> Respondido PONG a [" << ping_target << "]\n";
 							}
+							/*JOIN = para conectarte a un canal, los canales se llaman con prefijos: # ! & +*/
+							else if (line.compare(0, 5, "JOIN ") == 0)
+								handle_join_command(clientFd, line);
+							/*PRIVMSG = mensaje privado*/
+							else if (line.compare(0, 8, "PRIVMSG ") == 0)
+								handle_privmsg_command(clientFd, line);
 							else
 							{
-								// Por ahora devolvemos el saludo como antes
-								this->_clients[clientFd].outbuf += "Servidor dice: hola\r\n";
-								this->_fds[i].events |= POLLOUT;
+								// Comandos no implementados por ahora
+								send_numeric(clientFd, "421 :Unknown command");
 							}
 						}
 
