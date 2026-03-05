@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/04 17:42:54 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/05 11:28:24 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,13 +20,11 @@
 #include <csignal>
 #include <sys/socket.h>
 
-
-
 bool Server::nick_in_use(const std::string &nick) const
 {
 	for (std::map<int, Client>::const_iterator it = this->_clients.begin(); it != this->_clients.end(); ++it)
 	{
-		if (it->second.nick == nick)
+		if (it->second.nickname == nick)
 			return true;
 	}
 	return false;
@@ -35,7 +33,8 @@ bool Server::nick_in_use(const std::string &nick) const
 // helper para enviar mensajes numéricos o líneas
 void Server::send_numeric(int fd, const std::string &msg)
 {
-	if (this->_clients.find(fd) == this->_clients.end()) return;
+	if (this->_clients.find(fd) == this->_clients.end())
+		return;
 	this->_clients[fd].outbuf += msg + "\r\n";
 	// marcar POLLOUT: buscar en _fds y añadir POLLOUT a ese fd
 	for (size_t j = 0; j < this->_fds.size(); ++j)
@@ -166,6 +165,106 @@ bool Server::init_and_listen(long port, const std::string &password)
 	return true;
 }
 
+/* ===========================================================
+   FASE INICIAL DE AUTENTICACIÓN
+   Ahora NO cerramos conexión si el orden es incorrecto.
+   Permitimos PASS en cualquier momento antes del registro.
+   Si es incorrecto enviamos 464 pero NO cerramos.
+   CAP se ignora.
+   =========================================================== */
+bool Server::handle_initial_authentication(size_t &i, const std::string &line)
+{
+	int clientFd = this->_fds[i].fd;
+
+	if (line.compare(0, 5, "PASS ") == 0)
+	{
+		std::string given = line.substr(5);
+
+		if (given == this->_serverPassword)
+		{
+			this->_clients[clientFd].correctPass = true;
+			std::cout << "fd " << clientFd << " PASS correcto\n";
+		}
+		else
+		{
+			// ERR_PASSWDMISMATCH 464
+			send_numeric(clientFd, "464 :Password incorrect");
+			std::cout << "fd " << clientFd << " PASS incorrecto\n";
+		}
+	}
+	else if (line.compare(0, 4, "CAP ") == 0)
+	{
+		// ignoramos negociación CAP
+		send_numeric(clientFd, "CAP * LS :");
+		std::cout << "fd " << clientFd << " CAP recibido (ignorando)\n";
+	}
+
+	// NO cerramos nunca aquí
+	return false;
+}
+void Server::handle_nick_command(int clientFd, const std::string &line)
+{
+	std::string newnick = line.substr(5);
+
+	// limpiar espacios, CR ya eliminado arriba
+	if (newnick.empty())
+	{
+		// ERR_NONICKNAMEGIVEN 431 (no usar send() directo)
+		send_numeric(clientFd, "431 :No nickname given");
+	}
+	else if (nick_in_use(newnick))
+	{
+		// ERR_NICKNAMEINUSE 433 <nick> :Nickname is already in use
+		std::string err = "433 " + newnick + " :Nickname is already in use";
+		send_numeric(clientFd, err);
+	}
+	else
+	{
+		this->_clients[clientFd].nickname = newnick;
+		std::cout << "fd " << clientFd << " set NICK=" << newnick << "\n";
+	}
+}
+
+void Server::handle_user_command(int clientFd, const std::string &line)
+{
+	// FORMATO: USER <user> <mode> <unused> :<realname>
+	std::string rest = line.substr(5);
+	std::string user;
+	std::string realname;
+
+	size_t posColon = rest.find(" :");
+
+	if (posColon != std::string::npos)
+	{
+		realname = rest.substr(posColon + 2);
+		user = rest.substr(0, posColon);
+
+		size_t sp = user.find(' ');
+		if (sp != std::string::npos)
+			user = user.substr(0, sp);
+	}
+	else
+	{
+		size_t sp = rest.find(' ');
+		if (sp == std::string::npos)
+			user = rest;
+		else
+			user = rest.substr(0, sp);
+	}
+
+	if (!user.empty())
+	{
+		this->_clients[clientFd].username = user;
+		this->_clients[clientFd].realname = realname;
+		std::cout << "fd " << clientFd << " set USER=" << user << " REAL=" << realname << "\n";
+	}
+	else
+	{
+		// ERR_NEEDMOREPARAMS 461 (usar send_numeric en vez de send directo)
+		send_numeric(clientFd, "461 USER :Not enough parameters");
+	}
+}
+
 int Server::run_loop()
 {
 	while (g_running)
@@ -260,139 +359,44 @@ int Server::run_loop()
 						std::cout << "fd " << clientFd << " -> Línea recibida: [" << line << "]\n";
 
 						/* ================= FASE DE AUTENTICACIÓN ================= */
-						if (!this->_clients[clientFd].correctPass)
+						/* Ahora el orden no importa.
+							Permitimos recibir PASS, NICK, USER en cualquier orden.
+							El cliente solo queda registrado cuando tiene:
+							- PASS correcto
+							- NICK
+							- USER
+						*/
+						if (!this->_clients[clientFd].registered)
 						{
-							// esperamos "PASS <password>"
-							if (line.compare(0, 5, "PASS ") == 0)
-							{
-								std::string given = line.substr(5);
-								if (given == this->_serverPassword)
-								{
-									this->_clients[clientFd].correctPass = true;
-									this->_clients[clientFd].outbuf += "PASS accepted\r\n";
-									this->_fds[i].events |= POLLOUT;
-									std::cout << "fd " << clientFd << " autenticado correctamente\n";
-								}
-								else
-								{
-									// Contraseña incorrecta: enviar mensaje de error y cerrar
-									const char *err = "ERROR :Password incorrect\r\n";
-									send(clientFd, err, std::strlen(err), 0);
+							// Siempre permitir PASS y CAP antes del registro
+							handle_initial_authentication(i, line);
 
-									std::cout << "fd " << clientFd << " fallo autenticacion. Cerrando.\n";
-									close(clientFd);
-									this->_clients.erase(clientFd);
-									this->_fds.erase(this->_fds.begin() + i);
-									--i;
-									break;
-								}
-							}
-							// Clientes modernos (como irssi) negocian capacidades antes de PASS
-							// Envían "CAP LS" para preguntar qué soporta el servidor.
-							// No debemos cerrar la conexión por esto.
-							else if (line.compare(0, 4, "CAP ") == 0)
-							{
-								// Respondemos mínimamente indicando que no soportamos ninguna capability.
-								this->_clients[clientFd].outbuf += "CAP * LS :\r\n";
-								this->_fds[i].events |= POLLOUT;
-								std::cout << "fd " << clientFd << " CAP negociacion recibida (ignorando)\n";
-								// Seguimos esperando PASS
-							}
-							else
-							{
-								// No envió PASS como primer comando válido: rechazar y cerrar
-								const char *err = "ERROR :You must send PASS first\r\n";
-								send(clientFd, err, std::strlen(err), 0);
-
-								std::cout << "fd " << clientFd << " no envió PASS primero. Cerrando.\n";
-								close(clientFd);
-								this->_clients.erase(clientFd);
-								this->_fds.erase(this->_fds.begin() + i);
-								--i;
-								break;
-							}
-						}
-						else if (this->_clients[clientFd].correctPass && !this->_clients[clientFd].registered)
-						{
 							/* ---------------------------------------------------------
-							   Cliente autenticado con PASS pero NO registrado aún.
-							   Aquí procesamos NICK y USER, comprobamos nick en uso,
-							   guardamos nick/user/realname, y cuando tengamos ambos
-							   marcamos registered y enviamos RPL_WELCOME (001).
-							   --------------------------------------------------------- */
+							Cliente NO registrado aún.
+							Procesamos NICK y USER en cualquier orden.
+							--------------------------------------------------------- */
 
-							// NICK
 							if (line.compare(0, 5, "NICK ") == 0)
-							{
-								std::string newnick = line.substr(5);
-								// limpiar espacios, CR ya eliminado arriba
-								if (newnick.empty())
-								{
-									// ERR_NONICKNAMEGIVEN 431
-									const char *err = "431 :No nickname given\r\n";
-									send(clientFd, err, std::strlen(err), 0);
-								}
-								else if (nick_in_use(newnick))
-								{
-									// ERR_NICKNAMEINUSE 433 <nick> :Nickname is already in use
-									std::string err = "433 " + newnick + " :Nickname is already in use";
-									send_numeric(clientFd, err);
-								}
-								else
-								{
-									this->_clients[clientFd].nick = newnick;
-									std::cout << "fd " << clientFd << " set NICK=" << newnick << "\n";
-								}
-							}
-							// USER
+								handle_nick_command(clientFd, line);
 							else if (line.compare(0, 5, "USER ") == 0)
+								handle_user_command(clientFd, line);
+							else if (line.compare(0, 4, "JOIN") == 0)
 							{
-								// FORMATO: USER <username> <mode> <unused> :<realname>
-								// parse sencillo: tokenizar por espacios y buscar ':' para realname
-								std::string rest = line.substr(5);
-								std::string username;
-								std::string realname;
-								size_t posColon = rest.find(" :");
-								if (posColon != std::string::npos)
-								{
-									realname = rest.substr(posColon + 2);
-									username = rest.substr(0, posColon);
-									// username puede incluir otros campos; tomar primer token
-									size_t sp = username.find(' ');
-									if (sp != std::string::npos)
-										username = username.substr(0, sp);
-								}
-								else
-								{
-									// sin realname, tomar primer token
-									size_t sp = rest.find(' ');
-									if (sp == std::string::npos) username = rest;
-									else username = rest.substr(0, sp);
-								}
-
-								if (!username.empty())
-								{
-									this->_clients[clientFd].user = username;
-									this->_clients[clientFd].realname = realname;
-									std::cout << "fd " << clientFd << " set USER=" << username << " REAL=" << realname << "\n";
-								}
-								else
-								{
-									// ERR_NEEDMOREPARAMS 461
-									send(clientFd, "461 USER :Not enough parameters\r\n", 32, 0);
-								}
+								// ERR_NOTREGISTERED 451
+								send_numeric(clientFd, "451 :You have not registered");
 							}
 
-							// Si ya tenemos ambos, finalizar registro
-							if (!this->_clients[clientFd].nick.empty() && !this->_clients[clientFd].user.empty())
+							// Si ya tenemos PASS correcto + NICK + USER → registrar
+							if (this->_clients[clientFd].correctPass && !this->_clients[clientFd].nickname.empty() && !this->_clients[clientFd].username.empty())
 							{
 								this->_clients[clientFd].registered = true;
+
 								// enviar RPL_WELCOME (001) -- formato simplificado
-								std::string welcome = "001 " + this->_clients[clientFd].nick + " :Welcome to the simple IRCd";
+								std::string welcome = "001 " + this->_clients[clientFd].nickname + " :Welcome to the simple IRCd";
+
 								send_numeric(clientFd, welcome);
 
-								// (opcional) anunciar al resto, inicializar modos, etc.
-								std::cout << "fd " << clientFd << " registrado (nick+user). Enviada 001.\n";
+								std::cout << "fd " << clientFd << " registrado (PASS+NICK+USER). Enviada 001.\n";
 							}
 						}
 						else
@@ -400,8 +404,20 @@ int Server::run_loop()
 							/* Cliente ya autenticado y registrado: procesar comandos normales
 							   (PRIVMSG, JOIN, etc). Por ahora devolvemos el saludo que ya
 							   tenías antes — aquí es donde implementarás la lógica de comandos. */
-							this->_clients[clientFd].outbuf += "Servidor dice: hola\r\n";
-							this->_fds[i].events |= POLLOUT;
+							/* Cliente ya autenticado y registrado: procesar comandos normales */
+							/* IRSSI(cliente) esta mandando PING y si no contestamos PONG IRSSI(cliente) se desconecta*/
+							if (line.compare(0, 5, "PING ") == 0)
+							{
+								std::string ping_target = line.substr(5);
+								send_numeric(clientFd, "PONG " + ping_target);
+								std::cout << "fd " << clientFd << " -> Respondido PONG a [" << ping_target << "]\n";
+							}
+							else
+							{
+								// Por ahora devolvemos el saludo como antes
+								this->_clients[clientFd].outbuf += "Servidor dice: hola\r\n";
+								this->_fds[i].events |= POLLOUT;
+							}
 						}
 
 						this->_clients[clientFd].accum.erase(0, pos + 1);

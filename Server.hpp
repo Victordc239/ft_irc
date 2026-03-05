@@ -3,22 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/04 17:39:00 by vdiez-cu         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   main.cpp                                           :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/02/26 15:51:36 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/03 16:29:45 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/05 11:06:35 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,6 +20,7 @@
 #include <netinet/in.h>
 #include <csignal>
 #include "Client.hpp"
+#include "Channel.hpp"
 
 extern volatile sig_atomic_t g_running;
 
@@ -40,13 +29,17 @@ class Server
 	private:
 		int _server_fd;
 		std::vector<struct pollfd> _fds; // Estructura poll
-		std::map<int, Client> _clients;
 		std::string _serverPassword;
 		static const size_t BUF_SIZE = 512;
 		char _buf[512];
+		std::map<int, Client> _clients;
+		std::map<std::string, Channel> _channels;
 
 		bool nick_in_use(const std::string &nick) const;
 		void send_numeric(int fd, const std::string &msg);
+		bool	handle_initial_authentication(size_t &i, const std::string &line);
+		void	handle_nick_command(int clientFd, const std::string &line);
+		void	handle_user_command(int clientFd, const std::string &line);
 
 	public:
 		Server();
