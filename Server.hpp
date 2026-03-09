@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/09 14:58:06 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/09 17:29:32 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,7 +15,6 @@
 
 #include <vector>
 #include <map>
-#include <string>
 #include <poll.h>
 #include <netinet/in.h>
 #include <csignal>
@@ -52,6 +51,8 @@ class Server
 		void	handle_part_command(int clientFd, const std::string &line);
 		void	handle_privmsg_command(int clientFd, const std::string &line);
 		void	handle_kick_command(int clientFd, const std::string &line);
+		void	handle_invite_command(int clientFd, const std::string &line);
+		void	handle_topic_command(int clientFd, const std::string &line);
 
 	public:
 		Server();

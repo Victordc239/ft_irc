@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/09 15:18:36 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/09 16:58:53 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -284,20 +284,20 @@ void Server::handle_part_command(int clientFd, const std::string &line)
 
 	// extraer canal (soportamos sólo un canal en esta implementación)
 	size_t sp = line.find(' ', prefix_len);
-	std::string chan;
+	std::string channelName;
 	std::string reason;
 
 	if (sp == std::string::npos)
 	{
-		// puede que línea sea "PART #chan" o "PART #chan\r"
-		chan = line.substr(prefix_len);
+		// puede que línea sea "PART #channelName" o "PART #channelName\r"
+		channelName = line.substr(prefix_len);
 		// quitar CR final si existe
-		if (!chan.empty() && chan[chan.size() - 1] == '\r')
-			chan.erase(chan.size() - 1, 1);
+		if (!channelName.empty() && channelName[channelName.size() - 1] == '\r')
+			channelName.erase(channelName.size() - 1, 1);
 	}
 	else
 	{
-		chan = line.substr(prefix_len, sp - prefix_len);
+		channelName = line.substr(prefix_len, sp - prefix_len);
 		// buscar si hay ':' para reason después de sp
 		size_t colon = line.find(':', sp + 1);
 		if (colon != std::string::npos)
@@ -310,29 +310,29 @@ void Server::handle_part_command(int clientFd, const std::string &line)
 		{
 			// tal vez no haya comment: el resto es el canal o espacios
 			std::string maybe = line.substr(sp + 1);
-			// si no contiene ':', no lo usamos como reason; normalmente after chan there is optional reason introduced by ':'
+			// si no contiene ':', no lo usamos como reason; normalmente after channelName there is optional reason introduced by ':'
 			(void)maybe;
 		}
 	}
 
-	// trim sencillo de chan (inicio/fin)
-	while (!chan.empty() && (chan[0] == ' ' || chan[0] == '\t'))
-		chan.erase(0, 1);
+	// trim sencillo de channelName (inicio/fin)
+	while (!channelName.empty() && (channelName[0] == ' ' || channelName[0] == '\t'))
+		channelName.erase(0, 1);
 
-	while (!chan.empty() && (chan[chan.size() - 1] == ' ' || chan[chan.size() - 1] == '\t'))
-		chan.erase(chan.size() - 1, 1);
+	while (!channelName.empty() && (channelName[channelName.size() - 1] == ' ' || channelName[channelName.size() - 1] == '\t'))
+		channelName.erase(channelName.size() - 1, 1);
 
-	if (chan.empty())
+	if (channelName.empty())
 	{
 		send_numeric(clientFd, "461 PART :Not enough parameters");
 		return;
 	}
 
 	// Existe el canal?
-	std::map<std::string, Channel>::iterator it = this->_channels.find(chan);
+	std::map<std::string, Channel>::iterator it = this->_channels.find(channelName);
 	if (it == this->_channels.end())
 	{
-		send_numeric(clientFd, "403 " + chan + " :No such channel");
+		send_numeric(clientFd, "403 " + channelName + " :No such channel");
 		return;
 	}
 	Channel &channel = it->second;
@@ -340,7 +340,7 @@ void Server::handle_part_command(int clientFd, const std::string &line)
 	// Comprueba que el emisor esté en el canal
 	if (!channel.hasClient(clientFd))
 	{
-		send_numeric(clientFd, "442 " + chan + " :You're not on that channel");
+		send_numeric(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
 
@@ -354,7 +354,7 @@ void Server::handle_part_command(int clientFd, const std::string &line)
 	std::string prefix = emNick + "!" + emUser + "@localhost";
 
 	// Construir mensaje PART
-	std::string out = ":" + prefix + " PART " + chan;
+	std::string out = ":" + prefix + " PART " + channelName;
 	if (!reason.empty())
 		out += " :" + reason;
 	else
@@ -467,7 +467,6 @@ void Server::handle_privmsg_command(int clientFd, const std::string &line)
 			// evitar enviar al emisor
 			if (fd == clientFd)
 				continue;
-
 			// comprueba que el fd sigue en la tabla de clientes
 			if (this->_clients.find(fd) == this->_clients.end())
 			{

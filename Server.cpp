@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/09 14:57:52 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/09 17:30:51 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -339,9 +339,6 @@ int Server::run_loop()
 						}
 						else
 						{
-							/* Cliente ya autenticado y registrado: procesar comandos normales
-							   (PRIVMSG, JOIN, etc). Por ahora devolvemos el saludo que ya
-							   tenías antes — aquí es donde implementarás la lógica de comandos. */
 							/* Cliente ya autenticado y registrado: procesar comandos normales */
 							/* IRSSI(cliente) esta mandando PING y si no contestamos PONG IRSSI(cliente) se desconecta*/
 							if (line.compare(0, 5, "PING ") == 0)
@@ -362,13 +359,16 @@ int Server::run_loop()
 							/*KICK = operator expulsa a un regular user de un caanal*/
 							else if (line.compare(0, 5, "KICK ") == 0)
 								handle_kick_command(clientFd, line);
+							/*INVITE = operator invita a un cliente a un canaal*/
+							else if (line.compare(0, 7, "INVITE ") == 0)
+								handle_invite_command(clientFd, line);
+							/*TOPIC = Ver el topic del canal o cambiarlo*/
+							else if (line.compare(0, 6, "TOPIC ") == 0)
+								handle_topic_command(clientFd, line);
+							/*Comandos no implementados o desconocidgos*/
 							else
-							{
-								// Comandos no implementados por ahora
 								send_numeric(clientFd, "421 :Unknown command");
-							}
 						}
-
 						this->_clients[clientFd].accum.erase(0, pos + 1);
 					}
 				}
@@ -434,6 +434,17 @@ int Server::run_loop()
 		}
 	}
 
+	/*Mensaje de que el servidor se ha cerrado con Ctr+c o kill o Ctr+\*/
+	std::string shutdown_msg = "ERROR :Server is shutting down\r\n";
+	for (std::map<int, Client>::iterator it = this->_clients.begin(); it != this->_clients.end(); ++it)
+	{
+		int fd = it->first;
+		// Intentamos enviar de forma directa; si falla, lo ignoramos porque vamos a cerrar.
+		ssize_t s = send(fd, shutdown_msg.c_str(), shutdown_msg.size(), 0);
+		(void)s;
+	}
+	
+	// Cerrar todos los fds monitorizados (como ya hacías)
 	for (size_t j = 0; j < this->_fds.size(); ++j)
 		close(this->_fds[j].fd);
 

@@ -3,16 +3,14 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 15:51:36 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/04 22:47:02 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/09 17:14:53 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <iostream>
 #include <cstdlib>
-#include <csignal>
 #include "Server.hpp"
 
 volatile sig_atomic_t g_running = 1;
@@ -33,7 +31,8 @@ int main(int argc, char **argv)
 
 	//manejar señales de interrupcion
 	signal(SIGINT, sigint_handler); //Ctrl+C
-	signal(SIGQUIT, sigint_handler); /*Ctrl+\ */ 
+	signal(SIGQUIT, sigint_handler); /*Ctrl+\ */
+	signal(SIGTERM, sigint_handler); // kill, systemd stops, etc
 	signal(SIGPIPE, SIG_IGN); // Escribir a socket cerrado
 
 	// parsear puerto
