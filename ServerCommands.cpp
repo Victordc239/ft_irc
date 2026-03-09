@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/05 16:16:41 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/09 15:18:36 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -173,7 +173,7 @@ void Server::handle_join_command(int clientFd, const std::string &line)
 	if (this->_channels.find(nameChannel) == this->_channels.end())
 	{
 		Channel newChannel(nameChannel);
-		newChannel.operator_fd = clientFd;
+		newChannel.addOperator(clientFd);
 		this->_channels[nameChannel] = newChannel;
 		std::cout << "DEBUG JOIN: creado canal " << nameChannel << " por fd " << clientFd << "\n";
 	}
@@ -206,17 +206,20 @@ void Server::handle_join_command(int clientFd, const std::string &line)
 		std::string joinmsg = ":" + prefix + " JOIN " + nameChannel;
 
 		// Notificar a todos los miembros (incluido el que entra)
-		// IMPORTANTE: comprobamos que cada fd aún existe en _clients antes de enviar.
-		for (std::set<int>::iterator it = channel.clients.begin(); it != channel.clients.end(); ++it)
+		// IMPORTANTE: comprobamos que cada fd aún exista en _clients antes de enviar.
+		std::set<int>::iterator iteratorMessageJoin = channel.clients.begin();
+		while (iteratorMessageJoin != channel.clients.end())
 		{
-			int fd = *it;
+			int fd = *iteratorMessageJoin;
 			if (this->_clients.find(fd) == this->_clients.end())
 			{
 				std::cout << "DEBUG JOIN: saltando fd " << fd << " (no existe en _clients)\n";
+				++iteratorMessageJoin;
 				continue;
 			}
 			std::cout << "DEBUG JOIN: enviando JOIN a fd " << fd << " msg=[" << joinmsg << "]\n";
 			send_numeric(fd, joinmsg);
+			++iteratorMessageJoin;
 		}
 
 		/* ===========================================================
@@ -226,19 +229,32 @@ void Server::handle_join_command(int clientFd, const std::string &line)
 
 		std::string names = "353 " + nick + " = " + nameChannel + " :";
 
-		for (std::set<int>::iterator it = channel.clients.begin(); it != channel.clients.end(); ++it)
+		std::set<int>::iterator iteratorCreateList = channel.clients.begin();
+		while (iteratorCreateList != channel.clients.end())
 		{
-			int fd = *it;
+			int fd = *iteratorCreateList;
 			// Si el cliente ya no existe, lo ignoramos
 			if (this->_clients.find(fd) == this->_clients.end())
+			{
+				++iteratorCreateList;
 				continue;
+			}
 
+			std::string entryNick;
 			if (this->_clients[fd].nickname.empty())
-				names += intToString(fd) + " ";
+				entryNick = intToString(fd); //si no tiene nickname todavia usar el fd para identificarlo
 			else
-				names += this->_clients[fd].nickname + " ";
-		}
+				entryNick = this->_clients[fd].nickname;
 
+			// si es operador, añadir prefijo '@'
+			if (channel.isOperator(fd))
+				names += "@" + entryNick + " ";
+			else
+				names += entryNick + " ";
+
+			++iteratorCreateList;
+		}
+	
 		send_numeric(clientFd, names);
 
 		/* ===========================================================
@@ -255,6 +271,113 @@ void Server::handle_join_command(int clientFd, const std::string &line)
 		std::cout << "DEBUG JOIN: fd " << clientFd << " ya estaba en " << nameChannel << "\n";
 	}
 }
+
+void Server::handle_part_command(int clientFd, const std::string &line)
+{
+	// Prefijo "PART " longitud 5
+	const size_t prefix_len = 5;
+	if (line.size() <= prefix_len)
+	{
+		send_numeric(clientFd, "461 PART :Not enough parameters");
+		return;
+	}
+
+	// extraer canal (soportamos sólo un canal en esta implementación)
+	size_t sp = line.find(' ', prefix_len);
+	std::string chan;
+	std::string reason;
+
+	if (sp == std::string::npos)
+	{
+		// puede que línea sea "PART #chan" o "PART #chan\r"
+		chan = line.substr(prefix_len);
+		// quitar CR final si existe
+		if (!chan.empty() && chan[chan.size() - 1] == '\r')
+			chan.erase(chan.size() - 1, 1);
+	}
+	else
+	{
+		chan = line.substr(prefix_len, sp - prefix_len);
+		// buscar si hay ':' para reason después de sp
+		size_t colon = line.find(':', sp + 1);
+		if (colon != std::string::npos)
+		{
+			reason = line.substr(colon + 1);
+			if (!reason.empty() && reason[reason.size() - 1] == '\r')
+				reason.erase(reason.size() - 1, 1);
+		}
+		else
+		{
+			// tal vez no haya comment: el resto es el canal o espacios
+			std::string maybe = line.substr(sp + 1);
+			// si no contiene ':', no lo usamos como reason; normalmente after chan there is optional reason introduced by ':'
+			(void)maybe;
+		}
+	}
+
+	// trim sencillo de chan (inicio/fin)
+	while (!chan.empty() && (chan[0] == ' ' || chan[0] == '\t'))
+		chan.erase(0, 1);
+
+	while (!chan.empty() && (chan[chan.size() - 1] == ' ' || chan[chan.size() - 1] == '\t'))
+		chan.erase(chan.size() - 1, 1);
+
+	if (chan.empty())
+	{
+		send_numeric(clientFd, "461 PART :Not enough parameters");
+		return;
+	}
+
+	// Existe el canal?
+	std::map<std::string, Channel>::iterator it = this->_channels.find(chan);
+	if (it == this->_channels.end())
+	{
+		send_numeric(clientFd, "403 " + chan + " :No such channel");
+		return;
+	}
+	Channel &channel = it->second;
+
+	// Comprueba que el emisor esté en el canal
+	if (!channel.hasClient(clientFd))
+	{
+		send_numeric(clientFd, "442 " + chan + " :You're not on that channel");
+		return;
+	}
+
+	// Construir prefijo: nick!user@localhost
+	std::string emNick = this->_clients[clientFd].nickname;
+	std::string emUser = this->_clients[clientFd].username;
+	if (emNick.empty())
+		emNick = intToString(clientFd);
+	if (emUser.empty())
+		emUser = "user";
+	std::string prefix = emNick + "!" + emUser + "@localhost";
+
+	// Construir mensaje PART
+	std::string out = ":" + prefix + " PART " + chan;
+	if (!reason.empty())
+		out += " :" + reason;
+	else
+		out += " :";
+
+	// Enviar PART a todos los miembros del canal (incluyendo el que sale)
+	std::set<int>::iterator sit = channel.clients.begin();
+	while (sit != channel.clients.end())
+	{
+		int fd = *sit;
+		if (this->_clients.find(fd) != this->_clients.end())
+			send_numeric(fd, out);
+		++sit;
+	}
+
+	// Quitar al cliente del canal (Channel::removeClient también quita operadores)
+	channel.removeClient(clientFd);
+
+	// Si el canal queda vacío, eliminarlo del mapa
+	if (channel.clients.empty())
+		this->_channels.erase(it);
+}
+
 void Server::handle_privmsg_command(int clientFd, const std::string &line)
 {
 	// Formato: "PRIVMSG <target> :<message>"

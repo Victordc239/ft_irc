@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/05 16:08:42 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/09 14:58:06 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,12 +44,14 @@ class Server
 
 		bool	nick_in_use(const std::string &nick) const;
 		void	send_numeric(int fd, const std::string &msg);
+		int	get_fd_by_nick(const std::string &nick) const;
 		bool	handle_initial_authentication(size_t &i, const std::string &line);
 		void	handle_nick_command(int clientFd, const std::string &line);
 		void	handle_user_command(int clientFd, const std::string &line);
 		void	handle_join_command(int clientFd, const std::string &line);
-		int	get_fd_by_nick(const std::string &nick) const;
+		void	handle_part_command(int clientFd, const std::string &line);
 		void	handle_privmsg_command(int clientFd, const std::string &line);
+		void	handle_kick_command(int clientFd, const std::string &line);
 
 	public:
 		Server();

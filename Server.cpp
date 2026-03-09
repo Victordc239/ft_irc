@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/05 16:08:27 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/09 14:57:52 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,19 +14,19 @@
 
 std::string Server::intToString(int n)
 {
-    if (n == 0)
-        return "0";
+	if (n == 0)
+		return "0";
 
-    std::string result;
+	std::string result;
 
-    while (n > 0)
-    {
-        char digit = '0' + (n % 10);
-        result.insert(result.begin(), digit);
-        n /= 10;
-    }
+	while (n > 0)
+	{
+		char digit = '0' + (n % 10);
+		result.insert(result.begin(), digit);
+		n /= 10;
+	}
 
-    return result;
+	return result;
 }
 
 bool Server::nick_in_use(const std::string &nick) const
@@ -315,7 +315,10 @@ int Server::run_loop()
 								handle_nick_command(clientFd, line);
 							else if (line.compare(0, 5, "USER ") == 0)
 								handle_user_command(clientFd, line);
-							else if (line.compare(0, 4, "JOIN") == 0)
+							else if (line.compare(0, 4, "JOIN") == 0 || line.compare(0, 7, "PRIVMSG") == 0 ||
+									line.compare(0, 4, "KICK") == 0 || line.compare(0, 6, "INVITE") == 0 ||
+									line.compare(0, 5, "TOPIC") == 0 || line.compare(0, 4, "MODE") == 0 ||
+									line.compare(0, 4, "PART") == 0)
 							{
 								// ERR_NOTREGISTERED 451
 								send_numeric(clientFd, "451 :You have not registered");
@@ -350,9 +353,15 @@ int Server::run_loop()
 							/*JOIN = para conectarte a un canal, los canales se llaman con prefijos: # ! & +*/
 							else if (line.compare(0, 5, "JOIN ") == 0)
 								handle_join_command(clientFd, line);
+							/*PART = salir de un canal*/
+							else if (line.compare(0, 5, "PART ") == 0)
+								handle_part_command(clientFd, line);
 							/*PRIVMSG = mensaje privado*/
 							else if (line.compare(0, 8, "PRIVMSG ") == 0)
 								handle_privmsg_command(clientFd, line);
+							/*KICK = operator expulsa a un regular user de un caanal*/
+							else if (line.compare(0, 5, "KICK ") == 0)
+								handle_kick_command(clientFd, line);
 							else
 							{
 								// Comandos no implementados por ahora
