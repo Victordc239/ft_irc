@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/09 17:29:32 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/10 17:19:19 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,6 +25,8 @@
 #include <fcntl.h>
 #include <cerrno>
 #include <sys/socket.h>
+#include <cstdlib>
+#include <climits>
 #include "Client.hpp"
 #include "Channel.hpp"
 
@@ -41,18 +43,24 @@ class Server
 		std::map<int, Client> _clients;
 		std::map<std::string, Channel> _channels;
 
-		bool	nick_in_use(const std::string &nick) const;
-		void	send_numeric(int fd, const std::string &msg);
-		int	get_fd_by_nick(const std::string &nick) const;
-		bool	handle_initial_authentication(size_t &i, const std::string &line);
-		void	handle_nick_command(int clientFd, const std::string &line);
-		void	handle_user_command(int clientFd, const std::string &line);
-		void	handle_join_command(int clientFd, const std::string &line);
-		void	handle_part_command(int clientFd, const std::string &line);
-		void	handle_privmsg_command(int clientFd, const std::string &line);
-		void	handle_kick_command(int clientFd, const std::string &line);
-		void	handle_invite_command(int clientFd, const std::string &line);
-		void	handle_topic_command(int clientFd, const std::string &line);
+		bool	nickInUse(const std::string &nick) const;
+		void	sendNumeric(int fd, const std::string &msg);
+		int	getFdByNick(const std::string &nick) const;
+		bool	handleInitialAuthentication(size_t &i, const std::string &line);
+		void	handleNickCommand(int clientFd, const std::string &line);
+		void	handleUserCommand(int clientFd, const std::string &line);
+		void	handleJoinCommand(int clientFd, const std::string &line);
+		void	handlePartCommand(int clientFd, const std::string &line);
+		void	handlePrivmsgCommand(int clientFd, const std::string &line);
+		void	handleKickCommand(int clientFd, const std::string &line);
+		void	handleInviteCommand(int clientFd, const std::string &line);
+		void	handleTopicCommand(int clientFd, const std::string &line);
+		void	handleModeCommand(int clientFd, const std::string &line);
+		void	mode_i(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &prefix);
+		void	mode_t(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &prefix);
+		void	mode_k(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &param, const std::string &prefix);
+		void	mode_o(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &targetNick, const std::string &prefix);
+		void	mode_l(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &param, const std::string &prefix);
 
 	public:
 		Server();
@@ -60,10 +68,13 @@ class Server
 		Server &operator=(const Server &other);
 		~Server();
 
-		std::string	intToString(int n);
-		bool	init_and_listen(long port, const std::string &password);
-		int	set_nonblock(int fd);
-		int	run_loop();
+		bool	initAndListen(long port, const std::string &password);
+		int	setNonblock(int fd);
+		int	runLoop();
+
 };
+
+std::string	intToString(int n);
+long	ftStrtol(const char *str, char **endptr);
 
 #endif

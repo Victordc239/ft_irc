@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 15:51:36 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/09 17:14:53 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/10 17:18:31 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 
 	// parsear puerto
 	char *endptr = NULL;
-	long port = strtol(argv[1], &endptr, 10);
+	long port = ftStrtol(argv[1], &endptr);
 	if (*endptr != '\0' || port <= 0 || port > 65535)
 	{
 		std::cerr << "Puerto inválido: " << argv[1] << "\n";
@@ -45,8 +45,8 @@ int main(int argc, char **argv)
 	}
 
 	Server server;
-	if (!server.init_and_listen(port, argv[2]))
+	if (!server.initAndListen(port, argv[2]))
 		return 1;
 
-	return server.run_loop();
+	return server.runLoop();
 }

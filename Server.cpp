@@ -6,56 +6,45 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/09 17:30:51 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/10 17:05:12 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-std::string Server::intToString(int n)
+bool Server::nickInUse(const std::string &nick) const
 {
-	if (n == 0)
-		return "0";
+	std::map<int, Client>::const_iterator iterator = this->_clients.begin();
 
-	std::string result;
-
-	while (n > 0)
+	while (iterator != this->_clients.end())
 	{
-		char digit = '0' + (n % 10);
-		result.insert(result.begin(), digit);
-		n /= 10;
-	}
-
-	return result;
-}
-
-bool Server::nick_in_use(const std::string &nick) const
-{
-	for (std::map<int, Client>::const_iterator it = this->_clients.begin(); it != this->_clients.end(); ++it)
-	{
-		if (it->second.nickname == nick)
+		if (iterator->second.nickname == nick)
 			return true;
+		++iterator;
 	}
 	return false;
 }
 
-int Server::get_fd_by_nick(const std::string &nick) const
+int Server::getFdByNick(const std::string &nick) const
 {
-	for (std::map<int, Client>::const_iterator it = this->_clients.begin(); it != this->_clients.end(); ++it)
+	std::map<int, Client>::const_iterator iterator = this->_clients.begin();
+
+	while (iterator != this->_clients.end())
 	{
-		if (it->second.nickname == nick)
-			return it->first;
+		if (iterator->second.nickname == nick)
+			return (iterator->first);
+		++iterator;
 	}
-	return -1;
+	return (-1);
 }
 
 // helper para enviar mensajes numéricos o líneas
-void Server::send_numeric(int fd, const std::string &msg)
+void Server::sendNumeric(int fd, const std::string &msg)
 {
 	// Si el fd no está en la tabla de clientes, no hacemos nada.
 	if (this->_clients.find(fd) == this->_clients.end())
 	{
-		std::cout << "DEBUG send_numeric: fd " << fd << " no existe en _clients. Mensaje descartado: [" << msg << "]\n";
+		std::cout << "DEBUG sendNumeric: fd " << fd << " no existe en _clients. Mensaje descartado: [" << msg << "]\n";
 		return;
 	}
 
@@ -64,20 +53,23 @@ void Server::send_numeric(int fd, const std::string &msg)
 
 	// marcar POLLOUT: buscar en _fds y añadir POLLOUT a ese fd
 	bool found = false;
-	for (size_t j = 0; j < this->_fds.size(); ++j)
+	size_t j = 0;
+
+	while (j < this->_fds.size())
 	{
 		if (this->_fds[j].fd == fd)
 		{
 			this->_fds[j].events |= POLLOUT;
 			found = true;
-			std::cout << "DEBUG send_numeric: marcado POLLOUT para fd " << fd << " (msg: [" << msg << "])\n";
+			std::cout << "DEBUG sendNumeric: marcado POLLOUT para fd " << fd << " (msg: [" << msg << "])\n";
 			break;
 		}
+		++j;
 	}
-	if (!found)
-		std::cout << "DEBUG send_numeric: no existe pollfd para fd " << fd << " (msg: [" << msg << "])\n";
-}
 
+	if (!found)
+		std::cout << "DEBUG sendNumeric: no existe pollfd para fd " << fd << " (msg: [" << msg << "])\n";
+}
 
 Server::Server()
 {
@@ -106,11 +98,15 @@ Server &Server::operator=(const Server &other)
 		this->_server_fd = -1;
 	}
 	// cerramos todos los fds monitorizados (si los hay)
-	for (size_t j = 0; j < this->_fds.size(); ++j)
+	size_t j = 0;
+	while (j < this->_fds.size())
+	{
 		close(this->_fds[j].fd);
+		++j;
+	}
 	this->_fds.clear();
 	this->_clients.clear();
-	_serverPassword = other._serverPassword;
+	this->_serverPassword = other._serverPassword;
 	std::memcpy(this->_buf, other._buf, sizeof(this->_buf));
 	return *this;
 }
@@ -119,21 +115,26 @@ Server::~Server()
 {
 	if (this->_server_fd != -1)
 		close(this->_server_fd);
-	for (size_t j = 0; j < this->_fds.size(); ++j)
+
+	size_t j = 0;
+	while (j < this->_fds.size())
+	{
 		close(this->_fds[j].fd);
+		++j;
+	}
 }
 
 /*esta funcion hace que el socket no sea blocante, es decir que el primer cliente
 bloquearia a los siguientes si no envia nada y los siguientes se quieren conectar o mandar algo*/
-int Server::set_nonblock(int fd)
+int Server::setNonblock(int fd)
 {
 	int flags = fcntl(fd, F_GETFL, 0);
 	if (flags == -1)
-		return -1;
-	return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+		return (-1);
+	return (fcntl(fd, F_SETFL, flags | O_NONBLOCK));
 }
 
-bool Server::init_and_listen(long port, const std::string &password)
+bool Server::initAndListen(long port, const std::string &password)
 {
 	this->_serverPassword = password;
 
@@ -158,7 +159,7 @@ bool Server::init_and_listen(long port, const std::string &password)
 	}
 
 	// Hacer socket no bloqueante
-	if (Server::set_nonblock(this->_server_fd) == -1)
+	if (Server::setNonblock(this->_server_fd) == -1)
 		std::cerr << "WARNING: no se pudo poner server_fd non-blocking\n";
 
 	// Dirección servidor
@@ -200,7 +201,7 @@ bool Server::init_and_listen(long port, const std::string &password)
 	return true;
 }
 
-int Server::run_loop()
+int Server::runLoop()
 {
 	while (g_running)
 	{
@@ -255,7 +256,7 @@ int Server::run_loop()
 						break;
 					}
 
-					if (Server::set_nonblock(client_fd) == -1)
+					if (Server::setNonblock(client_fd) == -1)
 						std::cerr << "WARNING: no se pudo poner client_fd non-blocking\n";
 
 					pollfd cp;
@@ -266,7 +267,7 @@ int Server::run_loop()
 
 					this->_clients[client_fd] = Client(client_fd);
 
-					char client_ip[INET_ADDRSTRLEN];
+					char client_ip[INET_ADDRSTRLEN]; //tamaño máximo para almacenar la representación en texto de una dirección IPv4
 					if (inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip)) == NULL)
 						std::cout << "Cliente conectado (fd " << client_fd << ") desde [ip desconocida]:" << ntohs(client_addr.sin_port) << "!\n";
 					else
@@ -304,7 +305,7 @@ int Server::run_loop()
 						if (!this->_clients[clientFd].registered)
 						{
 							// Siempre permitir PASS y CAP antes del registro
-							handle_initial_authentication(i, line);
+							handleInitialAuthentication(i, line);
 
 							/* ---------------------------------------------------------
 							Cliente NO registrado aún.
@@ -312,16 +313,16 @@ int Server::run_loop()
 							--------------------------------------------------------- */
 
 							if (line.compare(0, 5, "NICK ") == 0)
-								handle_nick_command(clientFd, line);
+								handleNickCommand(clientFd, line);
 							else if (line.compare(0, 5, "USER ") == 0)
-								handle_user_command(clientFd, line);
+								handleUserCommand(clientFd, line);
 							else if (line.compare(0, 4, "JOIN") == 0 || line.compare(0, 7, "PRIVMSG") == 0 ||
 									line.compare(0, 4, "KICK") == 0 || line.compare(0, 6, "INVITE") == 0 ||
 									line.compare(0, 5, "TOPIC") == 0 || line.compare(0, 4, "MODE") == 0 ||
 									line.compare(0, 4, "PART") == 0)
 							{
 								// ERR_NOTREGISTERED 451
-								send_numeric(clientFd, "451 :You have not registered");
+								sendNumeric(clientFd, "451 :You have not registered");
 							}
 
 							// Si ya tenemos PASS correcto + NICK + USER → registrar
@@ -332,7 +333,7 @@ int Server::run_loop()
 								// enviar RPL_WELCOME (001) -- formato simplificado
 								std::string welcome = "001 " + this->_clients[clientFd].nickname + " :Welcome to the simple IRCd";
 
-								send_numeric(clientFd, welcome);
+								sendNumeric(clientFd, welcome);
 
 								std::cout << "fd " << clientFd << " registrado (PASS+NICK+USER). Enviada 001.\n";
 							}
@@ -344,30 +345,33 @@ int Server::run_loop()
 							if (line.compare(0, 5, "PING ") == 0)
 							{
 								std::string ping_target = line.substr(5);
-								send_numeric(clientFd, "PONG " + ping_target);
+								sendNumeric(clientFd, "PONG " + ping_target);
 								std::cout << "fd " << clientFd << " -> Respondido PONG a [" << ping_target << "]\n";
 							}
 							/*JOIN = para conectarte a un canal, los canales se llaman con prefijos: # ! & +*/
 							else if (line.compare(0, 5, "JOIN ") == 0)
-								handle_join_command(clientFd, line);
+								handleJoinCommand(clientFd, line);
 							/*PART = salir de un canal*/
 							else if (line.compare(0, 5, "PART ") == 0)
-								handle_part_command(clientFd, line);
+								handlePartCommand(clientFd, line);
 							/*PRIVMSG = mensaje privado*/
 							else if (line.compare(0, 8, "PRIVMSG ") == 0)
-								handle_privmsg_command(clientFd, line);
+								handlePrivmsgCommand(clientFd, line);
 							/*KICK = operator expulsa a un regular user de un caanal*/
 							else if (line.compare(0, 5, "KICK ") == 0)
-								handle_kick_command(clientFd, line);
+								handleKickCommand(clientFd, line);
 							/*INVITE = operator invita a un cliente a un canaal*/
 							else if (line.compare(0, 7, "INVITE ") == 0)
-								handle_invite_command(clientFd, line);
+								handleInviteCommand(clientFd, line);
 							/*TOPIC = Ver el topic del canal o cambiarlo*/
 							else if (line.compare(0, 6, "TOPIC ") == 0)
-								handle_topic_command(clientFd, line);
+								handleTopicCommand(clientFd, line);
+							/*MODE = operator puede cambiar diversas cosas con la flag +i +t +k +o +l*/
+							else if (line.compare(0, 5, "MODE ") == 0)
+								handleModeCommand(clientFd, line);
 							/*Comandos no implementados o desconocidgos*/
 							else
-								send_numeric(clientFd, "421 :Unknown command");
+								sendNumeric(clientFd, "421 :Unknown command");
 						}
 						this->_clients[clientFd].accum.erase(0, pos + 1);
 					}

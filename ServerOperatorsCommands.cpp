@@ -6,19 +6,19 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/09 14:39:18 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/09 17:29:42 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/10 17:13:51 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-void	Server::handle_kick_command(int clientFd, const std::string &line)
+void	Server::handleKickCommand(int clientFd, const std::string &line)
 {
 	// "KICK " tiene longitud 5
 	const size_t prefix_len = 5;
 	if (line.size() <= prefix_len)
 	{
-		send_numeric(clientFd, "461 KICK :Not enough parameters");
+		sendNumeric(clientFd, "461 KICK :Not enough parameters");
 		return;
 	}
 
@@ -26,7 +26,7 @@ void	Server::handle_kick_command(int clientFd, const std::string &line)
 	size_t sp = line.find(' ', prefix_len);
 	if (sp == std::string::npos)
 	{
-		send_numeric(clientFd, "461 KICK :Not enough parameters");
+		sendNumeric(clientFd, "461 KICK :Not enough parameters");
 		return;
 	}
 	std::string channelName = line.substr(prefix_len, sp - prefix_len);
@@ -74,7 +74,7 @@ void	Server::handle_kick_command(int clientFd, const std::string &line)
 
 	if (targetNick.empty())
 	{
-		send_numeric(clientFd, "461 KICK :Not enough parameters");
+		sendNumeric(clientFd, "461 KICK :Not enough parameters");
 		return;
 	}
 
@@ -82,7 +82,7 @@ void	Server::handle_kick_command(int clientFd, const std::string &line)
 	std::map<std::string, Channel>::iterator it = this->_channels.find(channelName);
 	if (it == this->_channels.end())
 	{
-		send_numeric(clientFd, "403 " + channelName + " :No such channel");
+		sendNumeric(clientFd, "403 " + channelName + " :No such channel");
 		return;
 	}
 	Channel &channel = it->second;
@@ -90,29 +90,29 @@ void	Server::handle_kick_command(int clientFd, const std::string &line)
 	// el emisor está en el canal?
 	if (!channel.hasClient(clientFd))
 	{
-		send_numeric(clientFd, "442 " + channelName + " :You're not on that channel");
+		sendNumeric(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
 
 	// el emisor es operador?
 	if (!channel.isOperator(clientFd))
 	{
-		send_numeric(clientFd, "482 " + channelName + " :You're not channel operator");
+		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
 
 	// existe el nick objetivo en el servidor?
-	int targetFd = get_fd_by_nick(targetNick);
+	int targetFd = getFdByNick(targetNick);
 	if (targetFd == -1)
 	{
-		send_numeric(clientFd, "401 " + targetNick + " :No such nick");
+		sendNumeric(clientFd, "401 " + targetNick + " :No such nick");
 		return;
 	}
 
 	// el objetivo está en el canal?
 	if (!channel.hasClient(targetFd))
 	{
-		send_numeric(clientFd, "441 " + targetNick + " " + channelName + " :They aren't on that channel");
+		sendNumeric(clientFd, "441 " + targetNick + " " + channelName + " :They aren't on that channel");
 		return;
 	}
 
@@ -138,7 +138,7 @@ void	Server::handle_kick_command(int clientFd, const std::string &line)
 	{
 		int fd = *sit;
 		if (this->_clients.find(fd) != this->_clients.end())
-			send_numeric(fd, out);
+			sendNumeric(fd, out);
 		++sit;
 	}
 
@@ -150,13 +150,13 @@ void	Server::handle_kick_command(int clientFd, const std::string &line)
 		this->_channels.erase(it);
 }
 
-void	Server::handle_invite_command(int clientFd, const std::string &line)
+void	Server::handleInviteCommand(int clientFd, const std::string &line)
 {
 	// "INVITE " tiene longitud 7
 	const size_t prefix_len = 7;
 	if (line.size() <= prefix_len)
 	{
-		send_numeric(clientFd, "461 INVITE :Not enough parameters");
+		sendNumeric(clientFd, "461 INVITE :Not enough parameters");
 		return;
 	}
 
@@ -164,7 +164,7 @@ void	Server::handle_invite_command(int clientFd, const std::string &line)
 	size_t sp = line.find(' ', prefix_len);
 	if (sp == std::string::npos)
 	{
-		send_numeric(clientFd, "461 INVITE :Not enough parameters");
+		sendNumeric(clientFd, "461 INVITE :Not enough parameters");
 		return;
 	}
 
@@ -175,7 +175,7 @@ void	Server::handle_invite_command(int clientFd, const std::string &line)
 	size_t channelNameStart = sp + 1;
 	if (channelNameStart >= line.size())
 	{
-		send_numeric(clientFd, "461 INVITE :Not enough parameters");
+		sendNumeric(clientFd, "461 INVITE :Not enough parameters");
 		return;
 	}
 
@@ -201,15 +201,15 @@ void	Server::handle_invite_command(int clientFd, const std::string &line)
 
 	if (targetNick.empty() || channelName.empty())
 	{
-		send_numeric(clientFd, "461 INVITE :Not enough parameters");
+		sendNumeric(clientFd, "461 INVITE :Not enough parameters");
 		return;
 	}
 
 	// comprobar que existe el nick objetivo en el servidor
-	int targetFd = get_fd_by_nick(targetNick);
+	int targetFd = getFdByNick(targetNick);
 	if (targetFd == -1)
 	{
-		send_numeric(clientFd, "401 " + targetNick + " :No such nick");
+		sendNumeric(clientFd, "401 " + targetNick + " :No such nick");
 		return;
 	}
 
@@ -217,7 +217,7 @@ void	Server::handle_invite_command(int clientFd, const std::string &line)
 	std::map<std::string, Channel>::iterator it = this->_channels.find(channelName);
 	if (it == this->_channels.end())
 	{
-		send_numeric(clientFd, "403 " + channelName + " :No such channel");
+		sendNumeric(clientFd, "403 " + channelName + " :No such channel");
 		return;
 	}
 	Channel &channel = it->second;
@@ -225,7 +225,7 @@ void	Server::handle_invite_command(int clientFd, const std::string &line)
 	// el emisor está en el canal?
 	if (!channel.hasClient(clientFd))
 	{
-		send_numeric(clientFd, "442 " + channelName + " :You're not on that channel");
+		sendNumeric(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
 
@@ -233,7 +233,7 @@ void	Server::handle_invite_command(int clientFd, const std::string &line)
 	if (channel.hasClient(targetFd))
 	{
 		// ERR_USERONCHANNEL 443
-		send_numeric(clientFd, "443 " + targetNick + " " + channelName + " :is already on channel");
+		sendNumeric(clientFd, "443 " + targetNick + " " + channelName + " :is already on channel");
 		return;
 	}
 
@@ -248,15 +248,15 @@ void	Server::handle_invite_command(int clientFd, const std::string &line)
 
 	// Mensaje INVITE que recibe el usuario invitado
 	std::string inviteMsg = ":" + prefix + " INVITE " + targetNick + " " + channelName;
-	send_numeric(targetFd, inviteMsg);
+	sendNumeric(targetFd, inviteMsg);
 
 	// Notificar al emisor con RPL_INVITING (341)
-	send_numeric(clientFd, "341 " + emNick + " " + targetNick + " " + channelName);
+	sendNumeric(clientFd, "341 " + emNick + " " + targetNick + " " + channelName);
 
 	std::cout << "DEBUG INVITE: fd " << clientFd << " invitó a " << targetNick << " a " << channelName << "\n";
 }
 
-void Server::handle_topic_command(int clientFd, const std::string &line)
+void Server::handleTopicCommand(int clientFd, const std::string &line)
 {
 	// Formatos posibles:
 	// "TOPIC <#channel>"              -> ver topic
@@ -264,7 +264,7 @@ void Server::handle_topic_command(int clientFd, const std::string &line)
 	const size_t prefix_len = 6; // strlen("TOPIC ")
 	if (line.size() <= prefix_len)
 	{
-		send_numeric(clientFd, "461 TOPIC :Not enough parameters");
+		sendNumeric(clientFd, "461 TOPIC :Not enough parameters");
 		return;
 	}
 
@@ -298,7 +298,7 @@ void Server::handle_topic_command(int clientFd, const std::string &line)
 
 	if (channelName.empty())
 	{
-		send_numeric(clientFd, "461 TOPIC :Not enough parameters");
+		sendNumeric(clientFd, "461 TOPIC :Not enough parameters");
 		return;
 	}
 
@@ -307,7 +307,7 @@ void Server::handle_topic_command(int clientFd, const std::string &line)
 	if (it == this->_channels.end())
 	{
 		// ERR_NOSUCHCHANNEL 403
-		send_numeric(clientFd, "403 " + channelName + " :No such channel");
+		sendNumeric(clientFd, "403 " + channelName + " :No such channel");
 		return;
 	}
 	Channel &channel = it->second;
@@ -316,7 +316,7 @@ void Server::handle_topic_command(int clientFd, const std::string &line)
 	if (!channel.hasClient(clientFd))
 	{
 		// ERR_NOTONCHANNEL 442
-		send_numeric(clientFd, "442 " + channelName + " :You're not on that channel");
+		sendNumeric(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
 
@@ -336,14 +336,14 @@ void Server::handle_topic_command(int clientFd, const std::string &line)
 		{
 			// RPL_TOPIC 332 : ":server 332 <nick> <channel> :<topic>"
 			std::string reply = ":ircserv 332 " + nick + " " + channelName + " :" + channel.getTopic();
-			send_numeric(clientFd, reply);
+			sendNumeric(clientFd, reply);
 			// (Opcional) podríamos enviar RPL_TOPICWHOTIME (333) con who/time; omitido por simplicidad
 		}
 		else
 		{
 			// RPL_NOTOPIC 331
 			std::string reply = ":ircserv 331 " + nick + " " + channelName + " :No topic is set";
-			send_numeric(clientFd, reply);
+			sendNumeric(clientFd, reply);
 		}
 		return;
 	}
@@ -358,7 +358,7 @@ void Server::handle_topic_command(int clientFd, const std::string &line)
 	if (channel.isTopicRestricted() && !channel.isOperator(clientFd))
 	{
 		// ERR_CHANOPRIVSNEEDED 482
-		send_numeric(clientFd, "482 " + channelName + " :You're not channel operator");
+		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
 
@@ -374,7 +374,196 @@ void Server::handle_topic_command(int clientFd, const std::string &line)
 	{
 		int fd = *sit;
 		if (this->_clients.find(fd) != this->_clients.end())
-			send_numeric(fd, out);
+			sendNumeric(fd, out);
 		++sit;
+	}
+}
+
+void Server::handleModeCommand(int clientFd, const std::string &line)
+{
+	const size_t prefix_len = 5; // "MODE "
+	if (line.size() <= prefix_len)
+	{
+		sendNumeric(clientFd, "461 MODE :Not enough parameters");
+		return;
+	}
+
+	// Extraer channelName y resto (rest puede contener modes + params)
+	size_t sp = line.find(' ', prefix_len);
+	std::string channelName;
+	std::string rest;
+	if (sp == std::string::npos)
+	{
+		channelName = line.substr(prefix_len);
+		if (!channelName.empty() && channelName[channelName.size() - 1] == '\r')
+			channelName.erase(channelName.size() - 1, 1);
+		rest = "";
+	}
+	else
+	{
+		channelName = line.substr(prefix_len, sp - prefix_len);
+		rest = line.substr(sp + 1);
+		if (!rest.empty() && rest[rest.size() - 1] == '\r')
+			rest.erase(rest.size() - 1, 1);
+	}
+
+	// trim sencillo channelName
+	while (!channelName.empty() && (channelName[0] == ' ' || channelName[0] == '\t'))
+		channelName.erase(0, 1);
+	while (!channelName.empty() && (channelName[channelName.size() - 1] == ' ' || channelName[channelName.size() - 1] == '\t'))
+		channelName.erase(channelName.size() - 1, 1);
+
+	if (channelName.empty())
+	{
+		sendNumeric(clientFd, "461 MODE :Not enough parameters");
+		return;
+	}
+
+	// existe el canal?
+	std::map<std::string, Channel>::iterator it = this->_channels.find(channelName);
+	if (it == this->_channels.end())
+	{
+		sendNumeric(clientFd, "403 " + channelName + " :No such channel");
+		return;
+	}
+	Channel &channel = it->second;
+
+	// emisor en canal?
+	if (!channel.hasClient(clientFd))
+	{
+		sendNumeric(clientFd, "442 " + channelName + " :You're not on that channel");
+		return;
+	}
+
+	// Construir prefix (nick!user@localhost) — lo usamos en los broadcasts
+	std::string nick = this->_clients[clientFd].nickname;
+	std::string user = this->_clients[clientFd].username;
+	if (nick.empty())
+		nick = intToString(clientFd);
+	if (user.empty())
+		user = "user";
+	std::string prefix = nick + "!" + user + "@localhost";
+
+	// Si no hay rest -> petición de ver modos actuales (RPL_CHANNELMODEIS 324)
+	if (rest.empty())
+	{
+		std::string modes = "";
+		std::string params = "";
+		if (channel.isInviteOnly())
+			modes += "i";
+		if (channel.isTopicRestricted())
+			modes += "t";
+		if (channel.hasKey())
+		{
+			modes += "k";
+			params += " " + channel.getKey();
+		}
+		if (channel.getLimit() > 0)
+		{
+			modes += "l";
+			params += " " + intToString(channel.getLimit());
+		}
+		std::string reply = ":ircserv 324 " + nick + " " + channelName + " +" + modes + params;
+		sendNumeric(clientFd, reply);
+		return;
+	}
+
+	// Tokenizar rest *manualmente* (sin usar split) — tokens separados por espacios
+	std::vector<std::string> tokens;
+	std::string s = rest;
+	while (!s.empty())
+	{
+		// saltar espacios iniciales
+		while (!s.empty() && (s[0] == ' ' || s[0] == '\t'))
+			s.erase(0, 1);
+		if (s.empty())
+			break;
+		size_t p = s.find(' ');
+		if (p == std::string::npos)
+		{
+			tokens.push_back(s);
+			break;
+		}
+		else
+		{
+			tokens.push_back(s.substr(0, p));
+			s.erase(0, p + 1);
+		}
+	}
+
+	if (tokens.empty())
+	{
+		sendNumeric(clientFd, "461 MODE :Not enough parameters");
+		return;
+	}
+
+	std::string modeToken = tokens[0]; // ej "+itk"
+	size_t paramIndex = 1;
+	bool plus = true;
+
+	for (size_t i = 0; i < modeToken.size(); ++i)
+	{
+		char c = modeToken[i];
+		if (c == '+')
+		{
+			plus = true;
+			continue;
+		}
+		
+		if (c == '-')
+		{
+			plus = false;
+			continue;
+		}
+
+		// Para los modos que requieren parámetro, obtenerlo desde tokens[paramIndex]
+		if (c == 'i')
+			mode_i(clientFd, channel, channelName, plus, prefix);
+		else if (c == 't')
+			mode_t(clientFd, channel, channelName, plus, prefix);
+		else if (c == 'k')
+		{
+			if (plus)
+			{
+				if (paramIndex >= tokens.size())
+				{
+					sendNumeric(clientFd, "461 MODE :Not enough parameters");
+					return;
+				}
+				mode_k(clientFd, channel, channelName, plus, tokens[paramIndex++], prefix);
+			}
+			else // -k no necesita parámetro porque no hay que poner ninguna contraseña
+				mode_k(clientFd, channel, channelName, plus, std::string(""), prefix);
+		}
+		else if (c == 'l')
+		{
+			if (plus)
+			{
+				if (paramIndex >= tokens.size())
+				{
+					sendNumeric(clientFd, "461 MODE :Not enough parameters");
+					return;
+				}
+				mode_l(clientFd, channel, channelName, plus, tokens[paramIndex++], prefix);
+			}
+			else // -l no necesita parámetro porque es para decir la cantidad de usuarios que hay y como vamos a quitar el limite no hacefalta
+				mode_l(clientFd, channel, channelName, plus, std::string(""), prefix);
+		}
+		else if (c == 'o')
+		{
+			// necesita parámetro nick
+			if (paramIndex >= tokens.size())
+			{
+				sendNumeric(clientFd, "461 MODE :Not enough parameters");
+				return;
+			}
+			mode_o(clientFd, channel, channelName, plus, tokens[paramIndex++], prefix);
+		}
+		else
+		{
+			// modo desconocido -> RPL_UNKNOWNMODE (usamos 472 como en implementaciones simples)
+			std::string unknown = ":ircserv 472 " + nick + " " + std::string(1, c) + " :is unknown mode char to me";
+			sendNumeric(clientFd, unknown);
+		}
 	}
 }

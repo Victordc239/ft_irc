@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:57 by victor            #+#    #+#             */
-/*   Updated: 2026/03/09 17:27:53 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/10 14:40:43 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,9 @@ Channel::Channel()
 	this->topic_set_by = "";
 	this->topic_set_time = 0;
 	this->topic_restricted = false;
+	this->invite_only = false;
+	this->key = "";
+	this->limit = 0;
 }
 
 Channel::Channel(const std::string &channel_name)
@@ -32,6 +35,9 @@ Channel::Channel(const std::string &channel_name)
 	this->topic_set_by = "";
 	this->topic_set_time = 0;
 	this->topic_restricted = false;
+	this->invite_only = false;
+	this->key = "";
+	this->limit = 0;
 }
 
 Channel::Channel(const Channel &other)
@@ -43,6 +49,9 @@ Channel::Channel(const Channel &other)
 	this->topic_set_by = other.topic_set_by;
 	this->topic_set_time = other.topic_set_time;
 	this->topic_restricted = other.topic_restricted;
+	this->invite_only = other.invite_only;
+	this->key = other.key;
+	this->limit = other.limit;
 }
 
 Channel &Channel::operator=(const Channel &other)
@@ -56,6 +65,9 @@ Channel &Channel::operator=(const Channel &other)
 		this->topic_set_by = other.topic_set_by;
 		this->topic_set_time = other.topic_set_time;
 		this->topic_restricted = other.topic_restricted;
+		this->invite_only = other.invite_only;
+		this->key = other.key;
+		this->limit = other.limit;
 	}
 	return *this;
 }
@@ -134,4 +146,49 @@ void Channel::setTopicRestricted(bool v)
 bool Channel::isTopicRestricted() const
 {
 	return this->topic_restricted;
+}
+
+void Channel::setInviteOnly(bool v)
+{
+	this->invite_only = v;
+}
+
+bool Channel::isInviteOnly() const
+{
+	return this->invite_only;
+}
+
+void Channel::setKey(const std::string &k)
+{
+	this->key = k;
+}
+
+bool Channel::hasKey() const
+{
+	return !this->key.empty();
+}
+
+const std::string &Channel::getKey() const
+{
+	return this->key;
+}
+
+void Channel::removeKey()
+{
+	this->key.clear();
+}
+
+void Channel::setLimit(int n)
+{
+	this->limit = n;
+}
+
+int Channel::getLimit() const
+{
+	return this->limit;
+}
+
+void Channel::removeLimit()
+{
+	this->limit = 0;
 }

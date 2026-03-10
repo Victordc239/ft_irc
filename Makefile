@@ -6,7 +6,7 @@
 #    By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/12/02 11:18:27 by victor            #+#    #+#              #
-#    Updated: 2026/03/09 15:19:05 by vdiez-cu         ###   ########.fr        #
+#    Updated: 2026/03/10 16:21:55 by vdiez-cu         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -17,7 +17,9 @@ SRCS		= main.cpp \
 			Client.cpp \
 			Channel.cpp \
 			ServerCommands.cpp \
-			ServerOperatorsCommands.cpp
+			ServerOperatorsCommands.cpp \
+			ServerCommandsModeFlags.cpp \
+			ServerUtils.cpp
 
 HEADERS	= Client.hpp \
 			Server.hpp \
