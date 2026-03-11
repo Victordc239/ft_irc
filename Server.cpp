@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/10 17:05:12 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/11 19:41:35 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -214,10 +214,14 @@ int Server::runLoop()
 			break;
 		}
 
-		for (size_t i = 0; i < this->_fds.size(); ++i)
+		size_t i = 0;
+		while (i < this->_fds.size())
 		{
 			if (this->_fds[i].revents == 0)
+			{
+				++i;
 				continue;
+			}
 
 			/*Error o desconexión en un cliente o en el servidor 
 			POLLERR=conexion rota, POLLHUP=cierras la terminal, POLLNVAL=fd corrupto*/
@@ -235,7 +239,6 @@ int Server::runLoop()
 					close(this->_fds[i].fd);
 					this->_clients.erase(this->_fds[i].fd);
 					this->_fds.erase(this->_fds.begin() + i);
-					--i;
 					continue;
 				}
 			}
@@ -273,6 +276,7 @@ int Server::runLoop()
 					else
 						std::cout << "Cliente conectado desde " << client_ip << ":" << ntohs(client_addr.sin_port) << " (fd " << client_fd << ")\n";
 				}
+				++i;
 				continue;
 			}
 
@@ -382,7 +386,7 @@ int Server::runLoop()
 					close(clientFd);
 					this->_clients.erase(clientFd);
 					this->_fds.erase(this->_fds.begin() + i);
-					--i;
+					continue;
 				}
 				else
 				{
@@ -392,7 +396,7 @@ int Server::runLoop()
 						close(clientFd);
 						this->_clients.erase(clientFd);
 						this->_fds.erase(this->_fds.begin() + i);
-						--i;
+						continue;
 					}
 				}
 			}
@@ -406,7 +410,6 @@ int Server::runLoop()
 				{
 					close(fd);
 					this->_fds.erase(this->_fds.begin() + i);
-					--i;
 					continue;
 				}
 
@@ -426,8 +429,7 @@ int Server::runLoop()
 						close(fd);
 						this->_clients.erase(fd);
 						this->_fds.erase(this->_fds.begin() + i);
-						--i;
-						break;
+						continue;
 					}
 				}
 
@@ -435,22 +437,29 @@ int Server::runLoop()
 				if (this->_clients.find(fd) != this->_clients.end() && this->_clients[fd].outbuf.empty())
 					this->_fds[i].events &= ~POLLOUT; /*esta linea=Deja de vigilar escritura para este socket y la ~ es para invertir todos los bits de POLLOUT*/
 			}
+
+			++i;
 		}
 	}
 
 	/*Mensaje de que el servidor se ha cerrado con Ctr+c o kill o Ctr+\*/
 	std::string shutdown_msg = "ERROR :Server is shutting down\r\n";
-	for (std::map<int, Client>::iterator it = this->_clients.begin(); it != this->_clients.end(); ++it)
+	std::map<int, Client>::iterator it = this->_clients.begin();
+	while (it != this->_clients.end())
 	{
 		int fd = it->first;
 		// Intentamos enviar de forma directa; si falla, lo ignoramos porque vamos a cerrar.
 		ssize_t s = send(fd, shutdown_msg.c_str(), shutdown_msg.size(), 0);
 		(void)s;
+		++it;
 	}
 	
-	// Cerrar todos los fds monitorizados (como ya hacías)
-	for (size_t j = 0; j < this->_fds.size(); ++j)
+	size_t j = 0;
+	while (j < this->_fds.size())
+	{
 		close(this->_fds[j].fd);
+		++j;
+	}
 
 	return 0;
 }

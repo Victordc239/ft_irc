@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/10 16:05:44 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/11 19:10:52 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -461,21 +461,27 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 		// reenviar a todos los clientes del canal (excepto el emisor)
 		std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
 
-		for (std::set<int>::iterator it = channel.clients.begin(); it != channel.clients.end(); ++it)
+		std::set<int>::iterator it = channel.clients.begin();
+		while (it != channel.clients.end())
 		{
 			int fd = *it;
 			// evitar enviar al emisor
 			if (fd == clientFd)
+			{
+				++it;
 				continue;
+			}
 			// comprueba que el fd sigue en la tabla de clientes
 			if (this->_clients.find(fd) == this->_clients.end())
 			{
 				std::cout << "DEBUG PRIVMSG: saltando fd " << fd << " (no existe en _clients)\n";
+				++it;
 				continue;
 			}
 
 			std::cout << "DEBUG PRIVMSG: reenviando PRIVMSG de fd " << clientFd << " a fd " << fd << " msg=[" << out << "]\n";
 			sendNumeric(fd, out);
+			++it;
 		}
 	}
 	else

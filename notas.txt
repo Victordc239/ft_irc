@@ -1,0 +1,8 @@
+- comprobar errores
+- conprobar lo de fcntl
+- hacer el bot del bonus
+- hacer el file transfer del bonus
+- hacer el README.md
+- comprobar el manejo de pasar el comando en partes con Ctrl+D y nc -C
+- comprobar el uso de fubciones prohibidas
+

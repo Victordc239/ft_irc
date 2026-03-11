@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/09 14:39:18 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/10 17:13:51 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/11 19:08:14 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -501,27 +501,29 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 	size_t paramIndex = 1;
 	bool plus = true;
 
-	for (size_t i = 0; i < modeToken.size(); ++i)
+	size_t i = 0;
+	while (i < modeToken.size())
 	{
-		char c = modeToken[i];
-		if (c == '+')
+		if (modeToken[i] == '+')
 		{
 			plus = true;
+			++i;
 			continue;
 		}
 		
-		if (c == '-')
+		if (modeToken[i] == '-')
 		{
 			plus = false;
+			++i;
 			continue;
 		}
 
 		// Para los modos que requieren parámetro, obtenerlo desde tokens[paramIndex]
-		if (c == 'i')
+		if (modeToken[i] == 'i')
 			mode_i(clientFd, channel, channelName, plus, prefix);
-		else if (c == 't')
+		else if (modeToken[i] == 't')
 			mode_t(clientFd, channel, channelName, plus, prefix);
-		else if (c == 'k')
+		else if (modeToken[i] == 'k')
 		{
 			if (plus)
 			{
@@ -535,7 +537,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 			else // -k no necesita parámetro porque no hay que poner ninguna contraseña
 				mode_k(clientFd, channel, channelName, plus, std::string(""), prefix);
 		}
-		else if (c == 'l')
+		else if (modeToken[i] == 'l')
 		{
 			if (plus)
 			{
@@ -549,7 +551,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 			else // -l no necesita parámetro porque es para decir la cantidad de usuarios que hay y como vamos a quitar el limite no hacefalta
 				mode_l(clientFd, channel, channelName, plus, std::string(""), prefix);
 		}
-		else if (c == 'o')
+		else if (modeToken[i] == 'o')
 		{
 			// necesita parámetro nick
 			if (paramIndex >= tokens.size())
@@ -562,8 +564,9 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		else
 		{
 			// modo desconocido -> RPL_UNKNOWNMODE (usamos 472 como en implementaciones simples)
-			std::string unknown = ":ircserv 472 " + nick + " " + std::string(1, c) + " :is unknown mode char to me";
+			std::string unknown = ":ircserv 472 " + nick + " " + std::string(1, modeToken[i]) + " :is unknown mode char to me";
 			sendNumeric(clientFd, unknown);
 		}
+		++i;
 	}
 }
