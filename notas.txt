@@ -1,11 +1,11 @@
 - Comprobar errores
-- Conprobar lo de fcntl (creo que no tiene solucion porque sino perderiamos las flags del socket)
+- Comprobar el uso de la función fcntl (posible solución: perderiamos las flags del socket)
 - Hacer el bot del bonus
 - Hacer el file transfer del bonus
 - Hacer el README.md
 - Comprobar el manejo de pasar el comando en partes con Ctrl+D y nc -C
-- Comprobar el uso de fubciones prohibidas
-- Funciones de máximo 100 líneas
-- Cambiar nombre funciones, variables y archivos
+- Comprobar el uso de funciones prohibidas
+- Comprobar que la funciones tienen máximo 100 líneas, sino modificar y dividir
+- Cambiar el nombre de las funciones, las variables y los archivos, nombres descriptivos
 - Comprobar hoja de correcciones : https://www.42evalhub.com/common/ftirc
 
