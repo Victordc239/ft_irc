@@ -7,4 +7,5 @@
 - Comprobar el uso de fubciones prohibidas
 - Funciones de máximo 100 líneas
 - Cambiar nombre funciones, variables y archivos
-- Comprobar hoja de correcciones 
+- Comprobar hoja de correcciones : https://www.42evalhub.com/common/ftirc
+
