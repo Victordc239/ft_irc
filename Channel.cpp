@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Channel.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:57 by victor            #+#    #+#             */
-/*   Updated: 2026/03/12 11:40:30 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/12 16:26:06 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,62 +14,62 @@
 
 Channel::Channel()
 {
-	this->name = "";
-	this->clients.clear();
-	this->operators.clear();
-	this->topic = "";
-	this->topic_set_by = "";
-	this->topic_set_time = 0;
-	this->topic_restricted = false;
-	this->invite_only = false;
-	this->key = "";
-	this->limit = 0;
+	name = "";
+	clients.clear();
+	operators.clear();
+	topic = "";
+	topic_set_by = "";
+	topic_set_time = 0;
+	topic_restricted = false;
+	invite_only = false;
+	key = "";
+	limit = 0;
 }
 
 Channel::Channel(const std::string &channel_name)
 {
-	this->name = channel_name;
-	this->clients.clear();
-	this->operators.clear();
-	this->topic = "";
-	this->topic_set_by = "";
-	this->topic_set_time = 0;
-	this->topic_restricted = false;
-	this->invite_only = false;
-	this->key = "";
-	this->limit = 0;
+	name = channel_name;
+	clients.clear();
+	operators.clear();
+	topic = "";
+	topic_set_by = "";
+	topic_set_time = 0;
+	topic_restricted = false;
+	invite_only = false;
+	key = "";
+	limit = 0;
 }
 
 Channel::Channel(const Channel &other)
 {
-	this->name = other.name;
-	this->clients = other.clients;
-	this->operators = other.operators;
-	this->topic = other.topic;
-	this->topic_set_by = other.topic_set_by;
-	this->topic_set_time = other.topic_set_time;
-	this->topic_restricted = other.topic_restricted;
-	this->invite_only = other.invite_only;
-	this->key = other.key;
-	this->limit = other.limit;
+	name = other.name;
+	clients = other.clients;
+	operators = other.operators;
+	topic = other.topic;
+	topic_set_by = other.topic_set_by;
+	topic_set_time = other.topic_set_time;
+	topic_restricted = other.topic_restricted;
+	invite_only = other.invite_only;
+	key = other.key;
+	limit = other.limit;
 }
 
 Channel &Channel::operator=(const Channel &other)
 {
 	if (this != &other)
 	{
-		this->name = other.name;
-		this->clients = other.clients;
-		this->operators = other.operators;
-		this->topic = other.topic;
-		this->topic_set_by = other.topic_set_by;
-		this->topic_set_time = other.topic_set_time;
-		this->topic_restricted = other.topic_restricted;
-		this->invite_only = other.invite_only;
-		this->key = other.key;
-		this->limit = other.limit;
+		name = other.name;
+		clients = other.clients;
+		operators = other.operators;
+		topic = other.topic;
+		topic_set_by = other.topic_set_by;
+		topic_set_time = other.topic_set_time;
+		topic_restricted = other.topic_restricted;
+		invite_only = other.invite_only;
+		key = other.key;
+		limit = other.limit;
 	}
-	return *this;
+	return (*this);
 }
 
 Channel::~Channel()
@@ -79,131 +79,131 @@ Channel::~Channel()
 
 void Channel::addClient(int fd)
 {
-	this->clients.insert(fd);
+	clients.insert(fd);
 }
 
 void Channel::removeClient(int fd)
 {
-	this->clients.erase(fd);
+	clients.erase(fd);
 	// si era operador, quitarlo también
-	this->operators.erase(fd);
+	operators.erase(fd);
 }
 
 bool Channel::hasClient(int fd) const
 {
-	return (this->clients.find(fd) != this->clients.end());
+	return (clients.find(fd) != clients.end());
 }
 
 void Channel::addOperator(int fd)
 {
-	this->operators.insert(fd);
+	operators.insert(fd);
 }
 
 void Channel::removeOperator(int fd)
 {
-	this->operators.erase(fd);
+	operators.erase(fd);
 }
 
 bool Channel::isOperator(int fd) const
 {
-	return (this->operators.find(fd) != this->operators.end());
+	return (operators.find(fd) != operators.end());
 }
 
 // setTopic guarda texto, quien lo puso (nickname) y la hora actual
 void Channel::setTopic(const std::string &newTopic, const std::string &setter)
 {
-	this->topic = newTopic;
-	this->topic_set_by = setter;
-	this->topic_set_time = std::time(NULL);
+	topic = newTopic;
+	topic_set_by = setter;
+	topic_set_time = std::time(NULL);
 }
 
 // indica si hay topic (topic != "")
 bool Channel::hasTopic() const
 {
-	return !this->topic.empty();
+	return !(topic.empty());
 }
 
 const std::string &Channel::getTopic() const
 {
-	return this->topic;
+	return (topic);
 }
 
 const std::string &Channel::getTopicSetter() const
 {
-	return this->topic_set_by;
+	return (topic_set_by);
 }
 
 time_t Channel::getTopicTime() const
 {
-	return this->topic_set_time;
+	return (topic_set_time);
 }
 
 void Channel::setTopicRestricted(bool v)
 {
-	this->topic_restricted = v;
+	topic_restricted = v;
 }
 
 bool Channel::isTopicRestricted() const
 {
-	return this->topic_restricted;
+	return (topic_restricted);
 }
 
 void Channel::setInviteOnly(bool v)
 {
-	this->invite_only = v;
+	invite_only = v;
 }
 
 bool Channel::isInviteOnly() const
 {
-	return this->invite_only;
+	return (invite_only);
 }
 
 void Channel::setKey(const std::string &k)
 {
-	this->key = k;
+	key = k;
 }
 
 bool Channel::hasKey() const
 {
-	return !this->key.empty();
+	return !(key.empty());
 }
 
 const std::string &Channel::getKey() const
 {
-	return this->key;
+	return (key);
 }
 
 void Channel::removeKey()
 {
-	this->key.clear();
+	key.clear();
 }
 
 void Channel::setLimit(int n)
 {
-	this->limit = n;
+	limit = n;
 }
 
 int Channel::getLimit() const
 {
-	return this->limit;
+	return (limit);
 }
 
 void Channel::removeLimit()
 {
-	this->limit = 0;
+	limit = 0;
 }
 
 bool Channel::isInvited(int fd) const
 {
-	return (this->invitedClients.find(fd) != this->invitedClients.end());
+	return (invitedClients.find(fd) != invitedClients.end());
 }
 
 void Channel::addInvite(int fd)
 {
-	this->invitedClients.insert(fd);
+	invitedClients.insert(fd);
 }
 
 void Channel::removeInvite(int fd)
 {
-	this->invitedClients.erase(fd);
+	invitedClients.erase(fd);
 }

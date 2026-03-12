@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerOperatorsCommands.cpp                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/09 14:39:18 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 11:43:01 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/12 16:41:45 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,13 +23,13 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 	}
 
 	// extraer canal (primer token tras "KICK ")
-	size_t sp = line.find(' ', prefix_len);
-	if (sp == std::string::npos)
+	size_t space = line.find(' ', prefix_len);
+	if (space == std::string::npos)
 	{
 		sendNumeric(clientFd, "461 KICK :Not enough parameters");
 		return;
 	}
-	std::string channelName = line.substr(prefix_len, sp - prefix_len);
+	std::string channelName = line.substr(prefix_len, space - prefix_len);
 
 	// trim simple de channelName (inicio/fin)
 	while (!channelName.empty() && (channelName[0] == ' ' || channelName[0] == '\t'))
@@ -42,21 +42,21 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 	std::string comment;
 
 	// buscar ':' que indica inicio de comment
-	size_t colon = line.find(':', sp + 1);
+	size_t colon = line.find(':', space + 1);
 
 	if (colon == std::string::npos)
 	{
 		// no hay comment, el nick va hasta el final
-		targetNick = line.substr(sp + 1);
+		targetNick = line.substr(space + 1);
 		// trim final CR si hay
 		if (!targetNick.empty() && targetNick[targetNick.size() - 1] == '\r')
 			targetNick.erase(targetNick.size() - 1, 1);
 	}
 	else
 	{
-		// nick está entre sp+1 y colon-1
-		if (colon > sp + 1)
-			targetNick = line.substr(sp + 1, colon - (sp + 1));
+		// nick está entre space+1 y colon-1
+		if (colon > space + 1)
+			targetNick = line.substr(space + 1, colon - (space + 1));
 		else
 			targetNick = "";
 		// comentario después de ':'
@@ -79,8 +79,8 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 	}
 
 	// ver si existe el canal
-	std::map<std::string, Channel>::iterator it = this->_channels.find(channelName);
-	if (it == this->_channels.end())
+	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
+	if (it == _channels.end())
 	{
 		sendNumeric(clientFd, "403 " + channelName + " :No such channel");
 		return;
@@ -117,8 +117,8 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 	}
 
 	// Construir prefijo: nick!user@localhost (igual que en otros comandos)
-	std::string emNick = this->_clients[clientFd].nickname;
-	std::string emUser = this->_clients[clientFd].username;
+	std::string emNick = _clients[clientFd].nickname;
+	std::string emUser = _clients[clientFd].username;
 	if (emNick.empty())
 		emNick = intToString(clientFd);
 	if (emUser.empty())
@@ -137,7 +137,7 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 	while (sit != channel.clients.end())
 	{
 		int fd = *sit;
-		if (this->_clients.find(fd) != this->_clients.end())
+		if (_clients.find(fd) != _clients.end())
 			sendNumeric(fd, out);
 		++sit;
 	}
@@ -147,7 +147,7 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 
 	// Si el canal queda vacío, eliminarlo del mapa
 	if (channel.clients.empty())
-		this->_channels.erase(it);
+		_channels.erase(it);
 }
 
 void	Server::handleInviteCommand(int clientFd, const std::string &line)
@@ -161,18 +161,18 @@ void	Server::handleInviteCommand(int clientFd, const std::string &line)
 	}
 
 	// extraer nick objetivo (primer token tras "INVITE ")
-	size_t sp = line.find(' ', prefix_len);
-	if (sp == std::string::npos)
+	size_t space = line.find(' ', prefix_len);
+	if (space == std::string::npos)
 	{
 		sendNumeric(clientFd, "461 INVITE :Not enough parameters");
 		return;
 	}
 
-	std::string targetNick = line.substr(prefix_len, sp - prefix_len);
+	std::string targetNick = line.substr(prefix_len, space - prefix_len);
 
 	// el resto es el canal (aceptamos "INVITE nick #channelName" y también "INVITE nick :#channelName")
 	std::string channelName;
-	size_t channelNameStart = sp + 1;
+	size_t channelNameStart = space + 1;
 	if (channelNameStart >= line.size())
 	{
 		sendNumeric(clientFd, "461 INVITE :Not enough parameters");
@@ -214,8 +214,8 @@ void	Server::handleInviteCommand(int clientFd, const std::string &line)
 	}
 
 	// comprobar que existe el canal
-	std::map<std::string, Channel>::iterator it = this->_channels.find(channelName);
-	if (it == this->_channels.end())
+	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
+	if (it == _channels.end())
 	{
 		sendNumeric(clientFd, "403 " + channelName + " :No such channel");
 		return;
@@ -238,8 +238,8 @@ void	Server::handleInviteCommand(int clientFd, const std::string &line)
 	}
 
 	// Construir prefijo: nick!user@localhost
-	std::string emNick = this->_clients[clientFd].nickname;
-	std::string emUser = this->_clients[clientFd].username;
+	std::string emNick = _clients[clientFd].nickname;
+	std::string emUser = _clients[clientFd].username;
 	if (emNick.empty())
 		emNick = intToString(clientFd);
 	if (emUser.empty())
@@ -272,10 +272,10 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	}
 
 	// extraer canal
-	size_t sp = line.find(' ', prefix_len);
+	size_t space = line.find(' ', prefix_len);
 	std::string channelName;
 	std::string rest;
-	if (sp == std::string::npos)
+	if (space == std::string::npos)
 	{
 		// sólo "TOPIC #channel" (sin espacio extra)
 		channelName = line.substr(prefix_len);
@@ -286,8 +286,8 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	}
 	else
 	{
-		channelName = line.substr(prefix_len, sp - prefix_len);
-		rest = line.substr(sp + 1);
+		channelName = line.substr(prefix_len, space - prefix_len);
+		rest = line.substr(space + 1);
 		// trim CR final si existe
 		if (!rest.empty() && rest[rest.size() - 1] == '\r')
 			rest.erase(rest.size() - 1, 1);
@@ -306,8 +306,8 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	}
 
 	// existe el canal?
-	std::map<std::string, Channel>::iterator it = this->_channels.find(channelName);
-	if (it == this->_channels.end())
+	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
+	if (it == _channels.end())
 	{
 		// ERR_NOSUCHCHANNEL 403
 		sendNumeric(clientFd, "403 " + channelName + " :No such channel");
@@ -324,8 +324,8 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	}
 
 	// Construir nick y prefix como en otros comandos
-	std::string nick = this->_clients[clientFd].nickname;
-	std::string user = this->_clients[clientFd].username;
+	std::string nick = _clients[clientFd].nickname;
+	std::string user = _clients[clientFd].username;
 	if (nick.empty())
 		nick = intToString(clientFd);
 	if (user.empty())
@@ -376,7 +376,7 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	while (sit != channel.clients.end())
 	{
 		int fd = *sit;
-		if (this->_clients.find(fd) != this->_clients.end())
+		if (_clients.find(fd) != _clients.end())
 			sendNumeric(fd, out);
 		++sit;
 	}
@@ -392,10 +392,10 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 	}
 
 	// Extraer channelName y resto (rest puede contener modes + params)
-	size_t sp = line.find(' ', prefix_len);
+	size_t space = line.find(' ', prefix_len);
 	std::string channelName;
 	std::string rest;
-	if (sp == std::string::npos)
+	if (space == std::string::npos)
 	{
 		channelName = line.substr(prefix_len);
 		if (!channelName.empty() && channelName[channelName.size() - 1] == '\r')
@@ -404,8 +404,8 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 	}
 	else
 	{
-		channelName = line.substr(prefix_len, sp - prefix_len);
-		rest = line.substr(sp + 1);
+		channelName = line.substr(prefix_len, space - prefix_len);
+		rest = line.substr(space + 1);
 		if (!rest.empty() && rest[rest.size() - 1] == '\r')
 			rest.erase(rest.size() - 1, 1);
 	}
@@ -422,9 +422,16 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		return;
 	}
 
+	/*Si el target no empieza con in caracter de canal entonces es un usuario y lo manejamos para hacerlo  invisible o no*/
+	if (channelName[0] != '#' && channelName[0] != '&' && channelName[0] != '+' && channelName[0] != '!')
+	{
+		mode_user(clientFd, channelName, rest);
+		return;
+	}
+
 	// existe el canal?
-	std::map<std::string, Channel>::iterator it = this->_channels.find(channelName);
-	if (it == this->_channels.end())
+	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
+	if (it == _channels.end())
 	{
 		sendNumeric(clientFd, "403 " + channelName + " :No such channel");
 		return;
@@ -439,8 +446,8 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 	}
 
 	// Construir prefix (nick!user@localhost) — lo usamos en los broadcasts
-	std::string nick = this->_clients[clientFd].nickname;
-	std::string user = this->_clients[clientFd].username;
+	std::string nick = _clients[clientFd].nickname;
+	std::string user = _clients[clientFd].username;
 	if (nick.empty())
 		nick = intToString(clientFd);
 	if (user.empty())

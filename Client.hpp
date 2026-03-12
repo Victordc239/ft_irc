@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Client.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:02 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/04 22:10:29 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/12 15:03:42 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,6 +26,7 @@ class Client
 		std::string username;	// username
 		std::string realname;	// parte después de ':' en USER ejemplo: [USER vdiez-cu vdiez-cu localhost :Victor Diez Cuesta]
 		bool registered;		// true cuando NICK+USER procesados
+		bool invisible;		// modo +i de usuario (invisible)
 
 		Client();
 		Client(int fd_client);

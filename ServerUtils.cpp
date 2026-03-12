@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 16:21:40 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/10 17:18:31 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/12 16:29:40 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,7 +15,7 @@
 std::string intToString(int n)
 {
 	if (n == 0)
-		return "0";
+		return ("0");
 
 	std::string result;
 
@@ -26,7 +26,7 @@ std::string intToString(int n)
 		n /= 10;
 	}
 
-	return result;
+	return (result);
 }
 
 long ftStrtol(const char *str, char **endptr)
@@ -35,7 +35,7 @@ long ftStrtol(const char *str, char **endptr)
 	{
 		if (endptr)
 			*endptr = NULL;
-		return 0;
+		return (0);
 	}
 
 	const char *s = str;
@@ -83,5 +83,5 @@ long ftStrtol(const char *str, char **endptr)
 			*endptr = (char *)str;
 	}
 
-	return result * sign;
+	return (result * sign);
 }

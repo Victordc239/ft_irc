@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 11:28:16 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/12 16:39:16 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,22 +14,22 @@
 
 bool Server::nickInUse(const std::string &nick) const
 {
-	std::map<int, Client>::const_iterator iterator = this->_clients.begin();
+	std::map<int, Client>::const_iterator iterator = _clients.begin();
 
-	while (iterator != this->_clients.end())
+	while (iterator != _clients.end())
 	{
 		if (iterator->second.nickname == nick)
-			return true;
+			return (true);
 		++iterator;
 	}
-	return false;
+	return (false);
 }
 
 int Server::getFdByNick(const std::string &nick) const
 {
-	std::map<int, Client>::const_iterator iterator = this->_clients.begin();
+	std::map<int, Client>::const_iterator iterator = _clients.begin();
 
-	while (iterator != this->_clients.end())
+	while (iterator != _clients.end())
 	{
 		if (iterator->second.nickname == nick)
 			return (iterator->first);
@@ -42,21 +42,21 @@ int Server::getFdByNick(const std::string &nick) const
 void Server::sendNumeric(int fd, const std::string &msg)
 {
 	// Si el fd no está en la tabla de clientes, no hacemos nada.
-	if (this->_clients.find(fd) == this->_clients.end())
+	if (_clients.find(fd) == _clients.end())
 		return;
 
 	// Añadimos CRLF según protocolo
-	this->_clients[fd].outbuf += msg + "\r\n";
+	_clients[fd].outbuf += msg + "\r\n";
 
 	// marcar POLLOUT: buscar en _fds y añadir POLLOUT a ese fd
 	bool found = false;
 	size_t j = 0;
 
-	while (j < this->_fds.size())
+	while (j < _fds.size())
 	{
-		if (this->_fds[j].fd == fd)
+		if (_fds[j].fd == fd)
 		{
-			this->_fds[j].events |= POLLOUT;
+			_fds[j].events |= POLLOUT;
 			found = true;
 			break;
 		}
@@ -69,53 +69,53 @@ void Server::sendNumeric(int fd, const std::string &msg)
 
 Server::Server()
 {
-	this->_server_fd = -1;
-	this->_serverPassword = "";
-	std::memset(this->_buf, 0, sizeof(this->_buf));
+	_server_fd = -1;
+	_serverPassword = "";
+	std::memset(_buf, 0, sizeof(_buf));
 }
 
 Server::Server(const Server &other)
 {
-	this->_server_fd = -1;
-	this->_serverPassword = other._serverPassword;
-	std::memcpy(this->_buf, other._buf, sizeof(this->_buf));
-	this->_fds.clear();
-	this->_clients.clear();
+	_server_fd = -1;
+	_serverPassword = other._serverPassword;
+	std::memcpy(_buf, other._buf, sizeof(_buf));
+	_fds.clear();
+	_clients.clear();
 }
 
 Server &Server::operator=(const Server &other)
 {
 	if (this == &other)
-		return *this;
+		return (*this);
 	// Si tenemos un server_fd abierto, lo cerramos porque vamos a sobrescribir el objeto.
-	if (this->_server_fd != -1)
+	if (_server_fd != -1)
 	{
-		close(this->_server_fd);
-		this->_server_fd = -1;
+		close(_server_fd);
+		_server_fd = -1;
 	}
 	// cerramos todos los fds monitorizados (si los hay)
 	size_t j = 0;
-	while (j < this->_fds.size())
+	while (j < _fds.size())
 	{
-		close(this->_fds[j].fd);
+		close(_fds[j].fd);
 		++j;
 	}
-	this->_fds.clear();
-	this->_clients.clear();
-	this->_serverPassword = other._serverPassword;
-	std::memcpy(this->_buf, other._buf, sizeof(this->_buf));
-	return *this;
+	_fds.clear();
+	_clients.clear();
+	_serverPassword = other._serverPassword;
+	std::memcpy(_buf, other._buf, sizeof(_buf));
+	return (*this);
 }
 
 Server::~Server()
 {
-	if (this->_server_fd != -1)
-		close(this->_server_fd);
+	if (_server_fd != -1)
+		close(_server_fd);
 
 	size_t j = 0;
-	while (j < this->_fds.size())
+	while (j < _fds.size())
 	{
-		close(this->_fds[j].fd);
+		close(_fds[j].fd);
 		++j;
 	}
 }
@@ -132,14 +132,14 @@ int Server::setNonblock(int fd)
 
 bool Server::initAndListen(long port, const std::string &password)
 {
-	this->_serverPassword = password;
+	_serverPassword = password;
 
 	// Crear socket servidor que es el que escucha
-	this->_server_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET=IPV4, SOCK_STREAM=TCP, 0=protocolo por defecto
-	if (this->_server_fd == -1)
+	_server_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET=IPV4, SOCK_STREAM=TCP, 0=protocolo por defecto
+	if (_server_fd == -1)
 	{
 		std::cerr << "ERROR: socket failure\n";
-		return false;
+		return (false);
 	}
 
 	std::cout << "Socket creado correctamente\n";
@@ -147,7 +147,7 @@ bool Server::initAndListen(long port, const std::string &password)
 	/*es para reusar el mismo puerto porque el kernel cuando cierras pone el puerto en time_wait y sin ello
 	no podrias usar el mismo puerto si cerramos el irc y lo volvemos a ejecutar acto seguido*/
 	int opt = 1;
-	if (setsockopt(this->_server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1)
+	if (setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1)
 	{
 		/*server_fd=socket, SOL_SOCKET=aplica a todo el socket(no solo al puerto o ip o protocolo),
 		SO_REUSEADDR=permite reusar ip y puerto, &opt=activarlo, sizeof(opt)=tamaño valor*/
@@ -155,7 +155,7 @@ bool Server::initAndListen(long port, const std::string &password)
 	}
 
 	// Hacer socket no bloqueante
-	if (Server::setNonblock(this->_server_fd) == -1)
+	if (Server::setNonblock(_server_fd) == -1)
 		std::cerr << "WARNING: no se pudo poner server_fd non-blocking\n";
 
 	// Dirección servidor
@@ -165,43 +165,43 @@ bool Server::initAndListen(long port, const std::string &password)
 	server_addr.sin_port = htons((uint16_t)port); //Conversion del numero del puerto en bits para que todos los ordenadores lo interpreten igual
 	server_addr.sin_addr.s_addr = INADDR_ANY; //cualquier adapator de red del ordenador, ethernet, wifi, localhost,...
 
-	if (bind(this->_server_fd, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) //le decimos a que puerto y ip esta asociado el socket
+	if (bind(_server_fd, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) //le decimos a que puerto y ip esta asociado el socket
 	{
 		std::cerr << "ERROR: bind failure\n";
-		close(this->_server_fd);
-		this->_server_fd = -1;
-		return false;
+		close(_server_fd);
+		_server_fd = -1;
+		return (false);
 	}
 
 	std::cout << "Bind hecho correctamente\n";
 
-	if (listen(this->_server_fd, SOMAXCONN) == -1)
+	if (listen(_server_fd, SOMAXCONN) == -1)
 	{
 		/*convierte el socket en un servidor que escucha todo lo que le manden los clientes*/
 		/*SOMAXCONN = valor del sistema que representa la máxima cantidad de conexiones pendientes permitidas*/
 		std::cerr << "ERROR: listen failure\n";
-		close(this->_server_fd);
-		this->_server_fd = -1;
-		return false;
+		close(_server_fd);
+		_server_fd = -1;
+		return (false);
 	}
 
 	std::cout << "Servidor escuchando...\n";
 
 	// Estructura poll
 	pollfd pfd;
-	pfd.fd = this->_server_fd; //vigilar el servidor
+	pfd.fd = _server_fd; //vigilar el servidor
 	pfd.events = POLLIN; //avisame cuando haya datos a leer
 	pfd.revents = 0; //eventos que han pasado
-	this->_fds.push_back(pfd);
+	_fds.push_back(pfd);
 
-	return true;
+	return (true);
 }
 
 int Server::runLoop()
 {
 	while (g_running)
 	{
-		int ret = poll(&this->_fds[0], this->_fds.size(), -1); // espera que haya algun evento en un cliente o en el servidor
+		int ret = poll(&_fds[0], _fds.size(), -1); // espera que haya algun evento en un cliente o en el servidor
 		if (ret == -1)
 		{
 			if (errno == EINTR)
@@ -209,21 +209,19 @@ int Server::runLoop()
 			std::cerr << "ERROR: poll falló\n";
 			break;
 		}
-
 		size_t i = 0;
-		while (i < this->_fds.size())
+		while (i < _fds.size())
 		{
-			if (this->_fds[i].revents == 0)
+			if (_fds[i].revents == 0)
 			{
 				++i;
 				continue;
 			}
-
 			/*Error o desconexión en un cliente o en el servidor 
 			POLLERR=conexion rota, POLLHUP=cierras la terminal, POLLNVAL=fd corrupto*/
-			if (this->_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
+			if (_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
 			{
-				if (this->_fds[i].fd == this->_server_fd)
+				if (_fds[i].fd == _server_fd)
 				{
 					std::cerr << "ERROR en server_fd (poll)\n";
 					g_running = 0;
@@ -231,22 +229,21 @@ int Server::runLoop()
 				}
 				else
 				{
-					std::cout << "Cliente (fd " << this->_fds[i].fd << ") se desconectó/err\n";
-					close(this->_fds[i].fd);
-					this->_clients.erase(this->_fds[i].fd);
-					this->_fds.erase(this->_fds.begin() + i);
+					std::cout << "Cliente (fd " << _fds[i].fd << ") se desconectó/err\n";
+					close(_fds[i].fd);
+					_clients.erase(_fds[i].fd);
+					_fds.erase(_fds.begin() + i);
 					continue;
 				}
 			}
-
 			// Nueva conexión entrante, POLLIN=poll recibe datos a leer
-			if (this->_fds[i].fd == this->_server_fd && (this->_fds[i].revents & POLLIN))
+			if (_fds[i].fd == _server_fd && (_fds[i].revents & POLLIN))
 			{
 				while (true)
 				{
 					sockaddr_in client_addr;
 					socklen_t client_len = sizeof(client_addr);
-					int client_fd = accept(this->_server_fd, (sockaddr*)&client_addr, &client_len);
+					int client_fd = accept(_server_fd, (sockaddr*)&client_addr, &client_len);
 					if (client_fd == -1)
 					{
 						if (errno == EAGAIN || errno == EWOULDBLOCK)
@@ -262,9 +259,9 @@ int Server::runLoop()
 					cp.fd = client_fd;
 					cp.events = POLLIN;
 					cp.revents = 0;
-					this->_fds.push_back(cp);
+					_fds.push_back(cp);
 
-					this->_clients[client_fd] = Client(client_fd);
+					_clients[client_fd] = Client(client_fd);
 
 					char client_ip[INET_ADDRSTRLEN]; //tamaño máximo para almacenar la representación en texto de una dirección IPv4
 					if (inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip)) == NULL)
@@ -275,20 +272,19 @@ int Server::runLoop()
 				++i;
 				continue;
 			}
-
-			if (this->_fds[i].revents & POLLIN)
+			if (_fds[i].revents & POLLIN)
 			{
-				int clientFd = this->_fds[i].fd;
-				ssize_t n = recv(clientFd, this->_buf, BUF_SIZE, 0); //la cantidad de bytes que ha enviado el cliente al servidor
+				int clientFd = _fds[i].fd;
+				ssize_t n = recv(clientFd, _buf, BUF_SIZE, 0); //la cantidad de bytes que ha enviado el cliente al servidor
 
 				if (n > 0)
 				{
-					this->_clients[clientFd].accum.append(this->_buf, this->_buf + n);
+					_clients[clientFd].accum.append(_buf, _buf + n);
 
 					size_t pos;
-					while ((pos = this->_clients[clientFd].accum.find('\n')) != std::string::npos)
+					while ((pos = _clients[clientFd].accum.find('\n')) != std::string::npos)
 					{
-						std::string line = this->_clients[clientFd].accum.substr(0, pos);
+						std::string line = _clients[clientFd].accum.substr(0, pos);
 						if (!line.empty() && line[line.size() - 1] == '\r')
 							line.erase(line.size() - 1);
 
@@ -302,7 +298,7 @@ int Server::runLoop()
 							- NICK
 							- USER
 						*/
-						if (!this->_clients[clientFd].registered)
+						if (!_clients[clientFd].registered)
 						{
 							// Siempre permitir PASS y CAP antes del registro
 							handleInitialAuthentication(i, line);
@@ -322,7 +318,7 @@ int Server::runLoop()
 									line.compare(0, 4, "PART") == 0)
 							{
 
-								Client &client = this->_clients[clientFd];
+								Client &client = _clients[clientFd];
 
 								std::cout << "fd " << clientFd << " intentó usar [" << line << "] sin registrarse. Falta: ";
 								if (!client.correctPass)
@@ -341,12 +337,12 @@ int Server::runLoop()
 							}
 
 							// Si ya tenemos PASS correcto + NICK + USER → registrar
-							if (this->_clients[clientFd].correctPass && !this->_clients[clientFd].nickname.empty() && !this->_clients[clientFd].username.empty())
+							if (_clients[clientFd].correctPass && !_clients[clientFd].nickname.empty() && !_clients[clientFd].username.empty())
 							{
-								this->_clients[clientFd].registered = true;
+								_clients[clientFd].registered = true;
 
 								// enviar RPL_WELCOME (001) -- formato simplificado
-								std::string welcome = "001 " + this->_clients[clientFd].nickname + " :Welcome to the simple IRCd";
+								std::string welcome = "001 " + _clients[clientFd].nickname + " :Welcome to the simple IRCd";
 
 								sendNumeric(clientFd, welcome);
 
@@ -355,9 +351,11 @@ int Server::runLoop()
 						}
 						else
 						{
-							/* Cliente ya autenticado y registrado: procesar comandos normales */
+							/* como irssi manda CAP para imprimir mensaje en el servidor de que lo ignoramos*/
+							if (line.compare(0, 4, "CAP ") == 0)
+								handleInitialAuthentication(i, line);
 							/* IRSSI(cliente) esta mandando PING y si no contestamos PONG IRSSI(cliente) se desconecta*/
-							if (line.compare(0, 5, "PING ") == 0)
+							else if (line.compare(0, 5, "PING ") == 0)
 							{
 								std::string ping_target = line.substr(5);
 								sendNumeric(clientFd, "PONG " + ping_target);
@@ -388,15 +386,15 @@ int Server::runLoop()
 							else
 								sendNumeric(clientFd, "421 :Unknown command");
 						}
-						this->_clients[clientFd].accum.erase(0, pos + 1);
+						_clients[clientFd].accum.erase(0, pos + 1);
 					}
 				}
 				else if (n == 0)
 				{
 					std::cout << "Cliente (fd " << clientFd << ") cerró conexión\n";
 					close(clientFd);
-					this->_clients.erase(clientFd);
-					this->_fds.erase(this->_fds.begin() + i);
+					_clients.erase(clientFd);
+					_fds.erase(_fds.begin() + i);
 					continue;
 				}
 				else
@@ -405,26 +403,25 @@ int Server::runLoop()
 					{
 						std::cerr << "ERROR: recv falló\n";
 						close(clientFd);
-						this->_clients.erase(clientFd);
-						this->_fds.erase(this->_fds.begin() + i);
+						_clients.erase(clientFd);
+						_fds.erase(_fds.begin() + i);
 						continue;
 					}
 				}
 			}
-
-			if (this->_fds[i].revents & POLLOUT)
+			if (_fds[i].revents & POLLOUT)
 			{
-				int fd = this->_fds[i].fd;
+				int fd = _fds[i].fd;
 
 				// Si por algún motivo el fd ya no existe en clients, lo cerramos
-				if (this->_clients.find(fd) == this->_clients.end())
+				if (_clients.find(fd) == _clients.end())
 				{
 					close(fd);
-					this->_fds.erase(this->_fds.begin() + i);
+					_fds.erase(_fds.begin() + i);
 					continue;
 				}
 
-				std::string &data = this->_clients[fd].outbuf;
+				std::string &data = _clients[fd].outbuf;
 
 				while (!data.empty())
 				{
@@ -438,25 +435,24 @@ int Server::runLoop()
 					{
 						std::cerr << "ERROR: send falló\n";
 						close(fd);
-						this->_clients.erase(fd);
-						this->_fds.erase(this->_fds.begin() + i);
+						_clients.erase(fd);
+						_fds.erase(_fds.begin() + i);
 						continue;
 					}
 				}
 
 				/*Si ya terminé de enviar todo al cliente, deja de preguntarle al sistema si puedo escribir*/
-				if (this->_clients.find(fd) != this->_clients.end() && this->_clients[fd].outbuf.empty())
-					this->_fds[i].events &= ~POLLOUT; /*esta linea=Deja de vigilar escritura para este socket y la ~ es para invertir todos los bits de POLLOUT*/
+				if (_clients.find(fd) != _clients.end() && _clients[fd].outbuf.empty())
+					_fds[i].events &= ~POLLOUT; /*esta linea=Deja de vigilar escritura para este socket y la ~ es para invertir todos los bits de POLLOUT*/
 			}
 
 			++i;
 		}
 	}
-
 	/*Mensaje de que el servidor se ha cerrado con Ctr+c o kill o Ctr+\*/
 	std::string shutdown_msg = "ERROR :Server is shutting down\r\n";
-	std::map<int, Client>::iterator it = this->_clients.begin();
-	while (it != this->_clients.end())
+	std::map<int, Client>::iterator it = _clients.begin();
+	while (it != _clients.end())
 	{
 		int fd = it->first;
 		// Intentamos enviar de forma directa; si falla, lo ignoramos porque vamos a cerrar.
@@ -464,13 +460,11 @@ int Server::runLoop()
 		(void)s;
 		++it;
 	}
-	
 	size_t j = 0;
-	while (j < this->_fds.size())
+	while (j < _fds.size())
 	{
-		close(this->_fds[j].fd);
+		close(_fds[j].fd);
 		++j;
 	}
-
-	return 0;
+	return (0);
 }
