@@ -1,8 +1,10 @@
-- comprobar errores
-- conprobar lo de fcntl (creo que no tiene solucion porque sino perderiamos las flags del socket)
-- hacer el bot del bonus
-- hacer el file transfer del bonus
-- hacer el README.md
-- comprobar el manejo de pasar el comando en partes con Ctrl+D y nc -C
-- comprobar el uso de fubciones prohibidas
-
+- Comprobar errores
+- Conprobar lo de fcntl (creo que no tiene solucion porque sino perderiamos las flags del socket)
+- Hacer el bot del bonus
+- Hacer el file transfer del bonus
+- Hacer el README.md
+- Comprobar el manejo de pasar el comando en partes con Ctrl+D y nc -C
+- Comprobar el uso de fubciones prohibidas
+- Funciones de máximo 100 líneas
+- Cambiar nombre funciones, variables y archivos
+- Comprobar hoja de correcciones 
