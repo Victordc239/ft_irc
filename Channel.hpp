@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Channel.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:48 by victor            #+#    #+#             */
-/*   Updated: 2026/03/10 14:39:17 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/12 11:39:24 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,6 +30,7 @@ class Channel
 		bool invite_only;			// operator puede invitar a un canal mode +i
 		std::string key;			// operator puede poner y quitar contraseña del canal mode +k (vacío = sin key)
 		int limit;				// operator puede poner limite de usuarios a canal mode +l (0 = sin límite)
+		std::set<int> invitedClients;	// lista de invitados temporales (para mode +i)
 
 		Channel();
 		Channel(const std::string &channel_name);
@@ -59,6 +60,10 @@ class Channel
 		void setLimit(int n);
 		int getLimit() const;
 		void removeLimit();
+		bool isInvited(int fd) const;
+		void addInvite(int fd);
+		void removeInvite(int fd);
+
 };
 
 #endif

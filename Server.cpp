@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/11 19:41:35 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/12 11:28:16 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -43,10 +43,7 @@ void Server::sendNumeric(int fd, const std::string &msg)
 {
 	// Si el fd no está en la tabla de clientes, no hacemos nada.
 	if (this->_clients.find(fd) == this->_clients.end())
-	{
-		std::cout << "DEBUG sendNumeric: fd " << fd << " no existe en _clients. Mensaje descartado: [" << msg << "]\n";
 		return;
-	}
 
 	// Añadimos CRLF según protocolo
 	this->_clients[fd].outbuf += msg + "\r\n";
@@ -61,14 +58,13 @@ void Server::sendNumeric(int fd, const std::string &msg)
 		{
 			this->_fds[j].events |= POLLOUT;
 			found = true;
-			std::cout << "DEBUG sendNumeric: marcado POLLOUT para fd " << fd << " (msg: [" << msg << "])\n";
 			break;
 		}
 		++j;
 	}
 
 	if (!found)
-		std::cout << "DEBUG sendNumeric: no existe pollfd para fd " << fd << " (msg: [" << msg << "])\n";
+		return;
 }
 
 Server::Server()
@@ -325,6 +321,21 @@ int Server::runLoop()
 									line.compare(0, 5, "TOPIC") == 0 || line.compare(0, 4, "MODE") == 0 ||
 									line.compare(0, 4, "PART") == 0)
 							{
+
+								Client &client = this->_clients[clientFd];
+
+								std::cout << "fd " << clientFd << " intentó usar [" << line << "] sin registrarse. Falta: ";
+								if (!client.correctPass)
+									std::cout << "PASS ";
+								if (client.nickname.empty())
+									std::cout << "NICK ";
+								if (client.username.empty())
+									std::cout << "USER ";
+								std::cout << std::endl;
+
+								// ERR_NOTREGISTERED 451
+								sendNumeric(clientFd, "451 :You have not registered");
+
 								// ERR_NOTREGISTERED 451
 								sendNumeric(clientFd, "451 :You have not registered");
 							}

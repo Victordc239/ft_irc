@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerOperatorsCommands.cpp                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/09 14:39:18 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/11 19:08:14 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/12 11:43:01 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -250,10 +250,13 @@ void	Server::handleInviteCommand(int clientFd, const std::string &line)
 	std::string inviteMsg = ":" + prefix + " INVITE " + targetNick + " " + channelName;
 	sendNumeric(targetFd, inviteMsg);
 
+	// Añadir invitación efectiva en la lista de invitados del canal
+	channel.addInvite(targetFd);
+
 	// Notificar al emisor con RPL_INVITING (341)
 	sendNumeric(clientFd, "341 " + emNick + " " + targetNick + " " + channelName);
 
-	std::cout << "DEBUG INVITE: fd " << clientFd << " invitó a " << targetNick << " a " << channelName << "\n";
+	std::cout << "INVITE: fd " << clientFd << " invitó a " << targetNick << " a " << channelName << "\n";
 }
 
 void Server::handleTopicCommand(int clientFd, const std::string &line)

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Channel.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:57 by victor            #+#    #+#             */
-/*   Updated: 2026/03/10 14:40:43 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/12 11:40:30 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -191,4 +191,19 @@ int Channel::getLimit() const
 void Channel::removeLimit()
 {
 	this->limit = 0;
+}
+
+bool Channel::isInvited(int fd) const
+{
+	return (this->invitedClients.find(fd) != this->invitedClients.end());
+}
+
+void Channel::addInvite(int fd)
+{
+	this->invitedClients.insert(fd);
+}
+
+void Channel::removeInvite(int fd)
+{
+	this->invitedClients.erase(fd);
 }

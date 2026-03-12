@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/11 19:10:52 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/12 11:41:26 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -144,16 +144,44 @@ void Server::handleUserCommand(int clientFd, const std::string &line)
 
 void Server::handleJoinCommand(int clientFd, const std::string &line)
 {
-	// Formato esperado: "JOIN <#channel>"
-	std::string nameChannel;
+	// Formato esperado: "JOIN <#channel> [key]"
+	std::string rest;
 	if (line.size() > 5)
-		nameChannel = line.substr(5);
+		rest = line.substr(5);
 
-	// Trim simple (elimina espacios al inicio/fin) por si el cliente manda cosas raras
-	while (!nameChannel.empty() && (nameChannel[0] == ' ' || nameChannel[0] == '\t'))
-		nameChannel.erase(0, 1);
-	while (!nameChannel.empty() && (nameChannel[nameChannel.size() - 1] == ' ' || nameChannel[nameChannel.size() - 1] == '\t'))
+	// trim inicio/fin
+	while (!rest.empty() && (rest[0] == ' ' || rest[0] == '\t'))
+		rest.erase(0, 1);
+	while (!rest.empty() && (rest[rest.size() - 1] == ' ' || rest[rest.size() - 1] == '\t'))
+		rest.erase(rest.size() - 1, 1);
+	if (rest.empty())
+	{
+		sendNumeric(clientFd, "461 JOIN :Not enough parameters");
+		return;
+	}
+
+	// separar canal y key opcional (solo soportamos un canal por JOIN en esta impl)
+	std::string nameChannel;
+	std::string joinKey;
+	size_t sp = rest.find(' ');
+	if (sp == std::string::npos)
+		nameChannel = rest;
+	else
+	{
+		nameChannel = rest.substr(0, sp);
+		joinKey = rest.substr(sp + 1);
+		// trim joinKey
+		while (!joinKey.empty() && (joinKey[0] == ' ' || joinKey[0] == '\t'))
+			joinKey.erase(0, 1);
+		while (!joinKey.empty() && (joinKey[joinKey.size() - 1] == ' ' || joinKey[joinKey.size() - 1] == '\t'))
+			joinKey.erase(joinKey.size() - 1, 1);
+	}
+
+	// quitar CR si hay
+	if (!nameChannel.empty() && nameChannel[nameChannel.size() - 1] == '\r')
 		nameChannel.erase(nameChannel.size() - 1, 1);
+	if (!joinKey.empty() && joinKey[joinKey.size() - 1] == '\r')
+		joinKey.erase(joinKey.size() - 1, 1);
 
 	if (nameChannel.empty())
 	{
@@ -161,8 +189,7 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		return;
 	}
 
-	/* VALIDACIÓN DEL NOMBRE DEL CANAL: en IRC original solo existen canales que tienen que empezar por
-	   uno de estos 4 prefijos, #=canal global, &=canal local, +=canal temporal, !=canal nombre especial */
+	/* VALIDACIÓN DEL NOMBRE DEL CANAL */
 	if (nameChannel[0] != '#' && nameChannel[0] != '&' && nameChannel[0] != '+' && nameChannel[0] != '!')
 	{
 		sendNumeric(clientFd, "403 " + nameChannel + " :Invalid channel prefix");
@@ -175,101 +202,119 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		Channel newChannel(nameChannel);
 		newChannel.addOperator(clientFd);
 		this->_channels[nameChannel] = newChannel;
-		std::cout << "DEBUG JOIN: creado canal " << nameChannel << " por fd " << clientFd << "\n";
 	}
 
 	Channel &channel = this->_channels[nameChannel];
 
 	// si ya está en el canal, ignorar (o podrías enviar 443 ERR_USERONCHANNEL)
-	if (!channel.hasClient(clientFd))
+	if (channel.hasClient(clientFd))
 	{
-		channel.addClient(clientFd);
+		std::cout << "JOIN: fd " << clientFd << " ya estaba en " << nameChannel << "\n";
+		return;
+	}
 
-		/* ===========================================================
-		   Construcción del prefijo IRC correcto
-		   formato estándar: nick!user@host
-		   para ft_irc no necesitamos host real → usamos localhost
-		   =========================================================== */
-
+	// === CHECK: invite-only (+i) ===
+	if (channel.isInviteOnly() && !channel.isInvited(clientFd))
+	{
+		// ERR_INVITEONLYCHAN 473
 		std::string nick = this->_clients[clientFd].nickname;
-		std::string user = this->_clients[clientFd].username;
-
-		if (nick.empty())
-			nick = intToString(clientFd);
-
-		if (user.empty())
-			user = "user";
-
-		std::string prefix = nick + "!" + user + "@localhost";
-
-		// mensaje JOIN que verán todos los clientes del canal
-		std::string joinmsg = ":" + prefix + " JOIN " + nameChannel;
-
-		// Notificar a todos los miembros (incluido el que entra)
-		// IMPORTANTE: comprobamos que cada fd aún exista en _clients antes de enviar.
-		std::set<int>::iterator iteratorMessageJoin = channel.clients.begin();
-		while (iteratorMessageJoin != channel.clients.end())
-		{
-			int fd = *iteratorMessageJoin;
-			if (this->_clients.find(fd) == this->_clients.end())
-			{
-				std::cout << "DEBUG JOIN: saltando fd " << fd << " (no existe en _clients)\n";
-				++iteratorMessageJoin;
-				continue;
-			}
-			std::cout << "DEBUG JOIN: enviando JOIN a fd " << fd << " msg=[" << joinmsg << "]\n";
-			sendNumeric(fd, joinmsg);
-			++iteratorMessageJoin;
-		}
-
-		/* ===========================================================
-		   Enviar lista de usuarios del canal al cliente que entra
-		   RPL_NAMREPLY (353)
-		   =========================================================== */
-
-		std::string names = "353 " + nick + " = " + nameChannel + " :";
-
-		std::set<int>::iterator iteratorCreateList = channel.clients.begin();
-		while (iteratorCreateList != channel.clients.end())
-		{
-			int fd = *iteratorCreateList;
-			// Si el cliente ya no existe, lo ignoramos
-			if (this->_clients.find(fd) == this->_clients.end())
-			{
-				++iteratorCreateList;
-				continue;
-			}
-
-			std::string entryNick;
-			if (this->_clients[fd].nickname.empty())
-				entryNick = intToString(fd); //si no tiene nickname todavia usar el fd para identificarlo
-			else
-				entryNick = this->_clients[fd].nickname;
-
-			// si es operador, añadir prefijo '@'
-			if (channel.isOperator(fd))
-				names += "@" + entryNick + " ";
-			else
-				names += entryNick + " ";
-
-			++iteratorCreateList;
-		}
-	
-		sendNumeric(clientFd, names);
-
-		/* ===========================================================
-		   Fin de lista de nombres
-		   RPL_ENDOFNAMES (366)
-		   =========================================================== */
-
-		sendNumeric(clientFd, "366 " + nick + " " + nameChannel + " :End of /NAMES list");
-
-		std::cout << "DEBUG JOIN: cliente fd " << clientFd << " unido a " << nameChannel << "\n";
+		if (nick.empty()) nick = intToString(clientFd);
+		sendNumeric(clientFd, "473 " + nick + " " + nameChannel + " :Cannot join channel (+i)");
+		return;
 	}
-	else
+
+	// === CHECK: key (+k) ===
+	if (channel.hasKey())
 	{
-		std::cout << "DEBUG JOIN: fd " << clientFd << " ya estaba en " << nameChannel << "\n";
+		// si no ha proporcionado key o es incorrecta -> ERR_BADCHANNELKEY 475
+		if (joinKey.empty() || joinKey != channel.getKey())
+		{
+			std::string nick = this->_clients[clientFd].nickname;
+			if (nick.empty()) nick = intToString(clientFd);
+			sendNumeric(clientFd, "475 " + nick + " " + nameChannel + " :Cannot join channel (+k)");
+			return;
+		}
 	}
+
+	// === CHECK: limit (+l) ===
+	if (channel.getLimit() > 0 && (int)channel.clients.size() >= channel.getLimit())
+	{
+		std::string nick = this->_clients[clientFd].nickname;
+		if (nick.empty()) nick = intToString(clientFd);
+		sendNumeric(clientFd, "471 " + nick + " " + nameChannel + " :Cannot join channel (+l)");
+		return;
+	}
+
+	// Todo OK -> unir al canal
+	channel.addClient(clientFd);
+
+	// Si venía por invitación, consumirla (la invitación se gasta)
+	if (channel.isInvited(clientFd))
+		channel.removeInvite(clientFd);
+
+	/* ===========================================================
+	   Construcción del prefijo IRC correcto (nick!user@localhost)
+	   =========================================================== */
+
+	std::string nick = this->_clients[clientFd].nickname;
+	std::string user = this->_clients[clientFd].username;
+
+	if (nick.empty())
+		nick = intToString(clientFd);
+
+	if (user.empty())
+		user = "user";
+
+	std::string prefix = nick + "!" + user + "@localhost";
+
+	// mensaje JOIN que verán todos los clientes del canal
+	std::string joinmsg = ":" + prefix + " JOIN " + nameChannel;
+
+	// Notificar a todos los miembros (incluido el que entra)
+	std::set<int>::iterator iteratorMessageJoin = channel.clients.begin();
+	while (iteratorMessageJoin != channel.clients.end())
+	{
+		int fd = *iteratorMessageJoin;
+		if (this->_clients.find(fd) == this->_clients.end())
+		{
+			++iteratorMessageJoin;
+			continue;
+		}
+		sendNumeric(fd, joinmsg);
+		++iteratorMessageJoin;
+	}
+
+	/* Enviar lista de usuarios del canal al cliente que entra (NAMES) */
+	std::string names = "353 " + nick + " = " + nameChannel + " :";
+
+	std::set<int>::iterator iteratorCreateList = channel.clients.begin();
+	while (iteratorCreateList != channel.clients.end())
+	{
+		int fd = *iteratorCreateList;
+		if (this->_clients.find(fd) == this->_clients.end())
+		{
+			++iteratorCreateList;
+			continue;
+		}
+
+		std::string entryNick;
+		if (this->_clients[fd].nickname.empty())
+			entryNick = intToString(fd);
+		else
+			entryNick = this->_clients[fd].nickname;
+
+		if (channel.isOperator(fd))
+			names += "@" + entryNick + " ";
+		else
+			names += entryNick + " ";
+
+		++iteratorCreateList;
+	}
+
+	sendNumeric(clientFd, names);
+	sendNumeric(clientFd, "366 " + nick + " " + nameChannel + " :End of /NAMES list");
+
+	std::cout << "JOIN: cliente fd " << clientFd << " unido a " << nameChannel << "\n";
 }
 
 void Server::handlePartCommand(int clientFd, const std::string &line)
@@ -474,12 +519,9 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 			// comprueba que el fd sigue en la tabla de clientes
 			if (this->_clients.find(fd) == this->_clients.end())
 			{
-				std::cout << "DEBUG PRIVMSG: saltando fd " << fd << " (no existe en _clients)\n";
 				++it;
 				continue;
 			}
-
-			std::cout << "DEBUG PRIVMSG: reenviando PRIVMSG de fd " << clientFd << " a fd " << fd << " msg=[" << out << "]\n";
 			sendNumeric(fd, out);
 			++it;
 		}
@@ -497,7 +539,7 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 
 		std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
 
-		std::cout << "DEBUG PRIVMSG: enviando PRIVMSG de fd " << clientFd << " a fd " << dst_fd << " msg=[" << out << "]\n";
+		std::cout << "PRIVMSG: enviando PRIVMSG de fd " << clientFd << " a fd " << dst_fd << " msg=[" << out << "]\n";
 		sendNumeric(dst_fd, out);
 	}
 }

@@ -1,5 +1,5 @@
 - comprobar errores
-- conprobar lo de fcntl
+- conprobar lo de fcntl (creo que no tiene solucion porque sino perderiamos las flags del socket)
 - hacer el bot del bonus
 - hacer el file transfer del bonus
 - hacer el README.md
