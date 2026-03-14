@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 16:39:16 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/14 15:32:07 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -328,9 +328,6 @@ int Server::runLoop()
 								if (client.username.empty())
 									std::cout << "USER ";
 								std::cout << std::endl;
-
-								// ERR_NOTREGISTERED 451
-								sendNumeric(clientFd, "451 :You have not registered");
 
 								// ERR_NOTREGISTERED 451
 								sendNumeric(clientFd, "451 :You have not registered");
