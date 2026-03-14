@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerOperatorsCommands.cpp                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/09 14:39:18 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 16:41:45 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/13 10:55:13 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -229,6 +229,13 @@ void	Server::handleInviteCommand(int clientFd, const std::string &line)
 		return;
 	}
 
+	// SOLO operadores pueden INVITE por defecto
+	if (!channel.isOperator(clientFd))
+	{
+		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
+		return;
+	}
+
 	// el objetivo ya está en el canal?
 	if (channel.hasClient(targetFd))
 	{
@@ -410,7 +417,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 			rest.erase(rest.size() - 1, 1);
 	}
 
-	// trim sencillo channelName
+	// Trim sencillo de channelName (inicio/fin)
 	while (!channelName.empty() && (channelName[0] == ' ' || channelName[0] == '\t'))
 		channelName.erase(0, 1);
 	while (!channelName.empty() && (channelName[channelName.size() - 1] == ' ' || channelName[channelName.size() - 1] == '\t'))
@@ -422,7 +429,8 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		return;
 	}
 
-	/*Si el target no empieza con in caracter de canal entonces es un usuario y lo manejamos para hacerlo  invisible o no*/
+	/* Si el target no empieza con un caracter de canal entonces es un usuario
+	   y lo manejamos para modos de usuario (ej. MODE <nick> +i) */
 	if (channelName[0] != '#' && channelName[0] != '&' && channelName[0] != '+' && channelName[0] != '!')
 	{
 		mode_user(clientFd, channelName, rest);
@@ -445,7 +453,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		return;
 	}
 
-	// Construir prefix (nick!user@localhost) — lo usamos en los broadcasts
+	// Construir nick/usser/prefix (los necesitamos para las respuestas)
 	std::string nick = _clients[clientFd].nickname;
 	std::string user = _clients[clientFd].username;
 	if (nick.empty())
@@ -454,7 +462,11 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		user = "user";
 	std::string prefix = nick + "!" + user + "@localhost";
 
-	// Si no hay rest -> petición de ver modos actuales (RPL_CHANNELMODEIS 324)
+	// ------------------------------
+	// Rama de LECTURA de modos (QUERY)
+	// Si rest está vacío -> petición de ver modos actuales (RPL_CHANNELMODEIS 324)
+	// Permitimos esta consulta a cualquier miembro del canal.
+	// ------------------------------
 	if (rest.empty())
 	{
 		std::string modes = "";
@@ -475,6 +487,16 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		}
 		std::string reply = ":ircserv 324 " + nick + " " + channelName + " +" + modes + params;
 		sendNumeric(clientFd, reply);
+		return;
+	}
+
+	// ------------------------------
+	// A partir de aquí -> se intenta CAMBIAR modos (rest NO está vacío)
+	// Por seguridad/consistencia: solo operadores pueden cambiar modos.
+	// ------------------------------
+	if (!channel.isOperator(clientFd))
+	{
+		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
 
@@ -520,7 +542,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 			++i;
 			continue;
 		}
-		
+
 		if (modeToken[i] == '-')
 		{
 			plus = false;
@@ -544,7 +566,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 				}
 				mode_k(clientFd, channel, channelName, plus, tokens[paramIndex++], prefix);
 			}
-			else // -k no necesita parámetro porque no hay que poner ninguna contraseña
+			else // -k no necesita parámetro
 				mode_k(clientFd, channel, channelName, plus, std::string(""), prefix);
 		}
 		else if (modeToken[i] == 'l')
@@ -558,7 +580,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 				}
 				mode_l(clientFd, channel, channelName, plus, tokens[paramIndex++], prefix);
 			}
-			else // -l no necesita parámetro porque es para decir la cantidad de usuarios que hay y como vamos a quitar el limite no hacefalta
+			else // -l no necesita parámetro para quitar el límite
 				mode_l(clientFd, channel, channelName, plus, std::string(""), prefix);
 		}
 		else if (modeToken[i] == 'o')

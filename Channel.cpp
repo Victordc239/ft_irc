@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Channel.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:57 by victor            #+#    #+#             */
-/*   Updated: 2026/03/12 16:26:06 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/12 20:04:45 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,7 +20,7 @@ Channel::Channel()
 	topic = "";
 	topic_set_by = "";
 	topic_set_time = 0;
-	topic_restricted = false;
+	topic_restricted = true;
 	invite_only = false;
 	key = "";
 	limit = 0;
@@ -34,7 +34,7 @@ Channel::Channel(const std::string &channel_name)
 	topic = "";
 	topic_set_by = "";
 	topic_set_time = 0;
-	topic_restricted = false;
+	topic_restricted = true;
 	invite_only = false;
 	key = "";
 	limit = 0;
