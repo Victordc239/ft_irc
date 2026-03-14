@@ -6,7 +6,7 @@
 /*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/14 15:32:07 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/14 15:52:29 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -379,6 +379,55 @@ int Server::runLoop()
 							/*MODE = operator puede cambiar diversas cosas con la flag +i +t +k +o +l*/
 							else if (line.compare(0, 5, "MODE ") == 0)
 								handleModeCommand(clientFd, line);
+							/*una vez ya autorizado respondemos si nos ponen denuevo estos comandos de autorizacion*/
+							else if (line.compare(0, 5, "PASS ") == 0 || line.compare(0, 5, "USER ") == 0)
+							{
+								// ERR_ALREADYREGISTERED 462
+								std::string cur = _clients[clientFd].nickname;
+								if (cur.empty())
+									cur = "*";
+								// Usamos prefijo de servidor como en otros mensajes de error
+								sendNumeric(clientFd, ":ircserv 462 " + cur + " :You may not reregister");
+							}
+							/*NICK = cambiar el nickname una vez el cliente ya esta registrado*/
+							else if (line.compare(0, 5, "NICK ") == 0)
+							{
+								// Guardamos el nick actual para poder saber si cambia
+								std::string originalNick = _clients[clientFd].nickname;
+
+								// Construimos el prefijo antiguo nick!user@host
+								std::string displayOldNick;
+								if (originalNick.empty())
+									displayOldNick = intToString(clientFd);
+								else
+									displayOldNick = originalNick;
+
+								std::string user;
+								if (_clients[clientFd].username.empty())
+									user = "user";
+								else
+									user = _clients[clientFd].username;
+
+								std::string oldPrefix = displayOldNick + "!" + user + "@localhost";
+
+								// Reutilizamos la función que ya valida y asigna el nuevo nick
+								handleNickCommand(clientFd, line);
+
+								// Si el nick cambió correctamente notificamos a los demás clientes
+								std::string newNick = _clients[clientFd].nickname;
+								if (newNick != originalNick && !newNick.empty())
+								{
+									std::string out = ":" + oldPrefix + " NICK " + newNick;
+
+									// Broadcast simple a todos los clientes conectados
+									std::map<int, Client>::iterator it = _clients.begin();
+									while (it != _clients.end())
+									{
+										sendNumeric(it->first, out);
+										++it;
+									}
+								}
+							}
 							/*Comandos no implementados o desconocidgos*/
 							else
 								sendNumeric(clientFd, "421 :Unknown command");
