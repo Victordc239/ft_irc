@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 15:06:23 by sofernan          #+#    #+#             */
-/*   Updated: 2026/03/16 16:54:42 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/16 17:11:23 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,12 +32,15 @@ std::string Bot::generateReply(const std::string &cmd, const std::string &nick, 
     if (cmd == "!time")
     {
         time_t now = time(NULL);
-        return (std::string("Server time: ") + ctime(&now));
+        std::string t = ctime(&now);
+        t.erase(t.size() - 1); // quita el '\n' final
+        return ("Server time: " + t);
     }
+    
     if (cmd.find("!kick ") == 0)
     {
-        std::string nick = cmd.substr(6);
-        return ("BOT_KICK " + nick);
+        kickTarget = cmd.substr(6);
+        return ("BOT_KICK" + kickTarget);
     }
 
     return ("");
