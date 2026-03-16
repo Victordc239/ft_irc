@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 17:41:14 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/16 18:26:06 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -914,13 +914,12 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
        INVOCAR AL BOT (solo si no es CTCP: no procesar mensajes que empiecen por \001)
        =========================================================== */
     std::string botReply;
-    std::string kickTarget;
     bool isCTCP = (!text.empty() && text[0] == '\001');
 
     if (!isCTCP)
     {
         // pasamos el texto tal cual al bot; el bot rellenará kickTarget si corresponde
-        botReply = _bot.generateReply(text, nick, target, kickTarget);
+        botReply = _bot.generateReply(text, nick);
     }
 
     /* ===========================================================
@@ -957,38 +956,8 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
                 ++itb;
             }
         }
-
-        // 2) Si el bot ha pedido kickTarget: realizar KICK en ese canal (si el nick está presente)
-        if (!kickTarget.empty())
-        {
-            int fdToKick = getFdByNick(kickTarget);
-            if (fdToKick != -1 && channel.hasClient(fdToKick))
-            {
-                std::string kickMsg = ":" + _bot.getName() + "!bot@localhost KICK " + target + " " + kickTarget + " :Kicked by bot";
-                // enviar KICK a todos los miembros del canal
-                std::set<int>::iterator itk = channel.clients.begin();
-                while (itk != channel.clients.end())
-                {
-                    int fd = *itk;
-                    if (_clients.find(fd) != _clients.end())
-                        sendNumeric(fd, kickMsg);
-                    ++itk;
-                }
-
-                // eliminar del conjunto de clientes del canal
-                channel.clients.erase(fdToKick);
-
-                // Si mantienes estructuras adicionales (p. ej. lista de canales en _clients[fd]), deberías también
-                // eliminar el canal de esa estructura aquí. Como esa estructura no aparece en el snippet original,
-                // dejo solo la eliminación del set del canal para mantener consistencia mínima.
-            }
-            else
-            {
-                // opcional: podrías notificar al emisor que el nick para kick no existe en el canal
-            }
-        }
-
-        // 3) Reenviar el PRIVMSG original a todos los miembros del canal (igual que antes)
+		
+        // 2) Reenviar el PRIVMSG original a todos los miembros del canal (igual que antes)
         std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
 
         std::set<int>::iterator it = channel.clients.begin();
