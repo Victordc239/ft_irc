@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 11:58:43 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/16 14:21:21 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -137,7 +137,7 @@ bool Server::initAndListen(long port, const std::string &password)
 	_serverPassword = password;
 
 	// Crear socket servidor que es el que escucha
-	_server_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET=IPV4, SOCK_STREAM=TCP, 0=protocolo por defecto
+		_server_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET=IPV4, SOCK_STREAM=TCP, 0=protocolo por defecto
 	if (_server_fd == -1)
 	{
 		std::cerr << "ERROR: socket failure\n";
@@ -153,12 +153,49 @@ bool Server::initAndListen(long port, const std::string &password)
 	{
 		/*server_fd=socket, SOL_SOCKET=aplica a todo el socket(no solo al puerto o ip o protocolo),
 		SO_REUSEADDR=permite reusar ip y puerto, &opt=activarlo, sizeof(opt)=tamaño valor*/
-		std::cerr << "WARNING: setsockopt falló\n";
+		std::cerr << "ERROR: setsockopt falló\n";
+
+		// limpiar y salir: cerrar server_fd y cualquier otro fd abierto en _fds/_clients
+		if (_server_fd != -1)
+		{
+			close(_server_fd);
+			_server_fd = -1;
+		}
+		// por seguridad cerrar cualquier fd que pudiera haberse registrado antes (aunque normalmente _fds está vacío aquí)
+		size_t jj = 0;
+		while (jj < _fds.size())
+		{
+			close(_fds[jj].fd);
+			++jj;
+		}
+		_fds.clear();
+		_clients.clear();
+
+		return (false);
 	}
 
 	// Hacer socket no bloqueante
 	if (Server::setNonblock(_server_fd) == -1)
-		std::cerr << "WARNING: no se pudo poner server_fd non-blocking\n";
+	{
+		std::cerr << "ERROR: no se pudo poner server_fd non-blocking\n";
+
+		// limpiar y salir: cerrar server_fd y cualquier otro fd abierto
+		if (_server_fd != -1)
+		{
+			close(_server_fd);
+			_server_fd = -1;
+		}
+		size_t jj = 0;
+		while (jj < _fds.size())
+		{
+			close(_fds[jj].fd);
+			++jj;
+		}
+		_fds.clear();
+		_clients.clear();
+
+		return (false);
+	}
 
 	// Dirección servidor
 	sockaddr_in server_addr; //estructura que ya existe para guardar ip y puerto del servidor
@@ -225,210 +262,8 @@ int Server::runLoop()
 			   Este bloque prioriza eventos de transferencias de archivos (listeners, peer, remote).
 			   Si el fd actual pertenece a una transferencia, lo manejamos aquí y continuamos.
 			*/
-			{
-				int curFd = _fds[i].fd;
-				std::map<int, unsigned long>::iterator itmap = _fdToTransferId.find(curFd);
-				if (itmap != _fdToTransferId.end())
-				{
-					unsigned long tid = itmap->second;
-					std::map<unsigned long, FileTransfer>::iterator itft = _transfers.find(tid);
-					if (itft == _transfers.end())
-					{
-						// mapping huérfano -> limpiar y seguir
-						_fdToTransferId.erase(itmap);
-						++i;
-						continue;
-					}
-					FileTransfer &ft = itft->second;
-
-					// 1) Listener accept: si el fd es el listener y hay POLLIN => accept()
-					if (curFd == ft.listenerFd && (_fds[i].revents & POLLIN))
-					{
-						struct sockaddr_in peerAddr;
-						socklen_t alen = sizeof(peerAddr);
-						int newfd = accept(ft.listenerFd, (struct sockaddr*)&peerAddr, &alen);
-						if (newfd != -1)
-						{
-							if (Server::setNonblock(newfd) == -1)
-							{
-								close(newfd);
-								newfd = -1;
-							}
-							else
-							{
-								// asignar al primer slot libre (peerFd o remoteFd)
-								if (ft.peerFd == -1)
-									ft.peerFd = newfd;
-								else if (ft.remoteFd == -1)
-									ft.remoteFd = newfd;
-								else
-								{
-									// ya hay dos extremos ocupados -> cerrar el excedente
-									close(newfd);
-									newfd = -1;
-								}
-
-								// si hemos aceptado correctamente, añadir newfd a poll y mapping
-								if (newfd != -1)
-								{
-									pollfd p;
-									p.fd = newfd;
-									p.events = POLLIN;
-									p.revents = 0;
-									_fds.push_back(p);
-									_fdToTransferId[newfd] = tid;
-								}
-
-								// si ahora tenemos ambos extremos, marcar bothConnected y notificar
-								if (ft.peerFd != -1 && ft.remoteFd != -1)
-								{
-									ft.bothConnected = true;
-									ft.lastActivity = std::time(NULL);
-									// opcional: notificar al sender si está conectado
-									if (_clients.find(ft.senderFd) != _clients.end())
-									{
-										std::string sNick = _clients[ft.senderFd].nickname;
-										if (sNick.empty()) sNick = intToString(ft.senderFd);
-										sendNumeric(ft.senderFd, ":ircserv NOTICE " + sNick + " :DCC proxy connection established for id=" + intToString((int)ft.id));
-									}
-								}
-							}
-						}
-						++i;
-						continue;
-					}
-
-					// 2) Relay: lectura en peer o remote
-					bool isPeer = (curFd == ft.peerFd);
-					bool isRemote = (curFd == ft.remoteFd);
-					if ((isPeer || isRemote) && (_fds[i].revents & POLLIN))
-					{
-						char tmpbuf[4096];
-						ssize_t rn = recv(curFd, tmpbuf, sizeof(tmpbuf), 0);
-						if (rn > 0)
-						{
-							ft.lastActivity = std::time(NULL);
-							if (isPeer)
-								ft.buf_peer_to_remote.append(tmpbuf, tmpbuf + rn);
-							else
-								ft.buf_remote_to_peer.append(tmpbuf, tmpbuf + rn);
-
-							// intentar enviar inmediatamente al otro extremo
-							int dst;
-							if (isPeer)
-								dst = ft.remoteFd;
-							else
-								dst = ft.peerFd;
-
-							std::string *outbuf;
-							if (isPeer)
-								outbuf = &ft.buf_peer_to_remote;
-							else
-								outbuf = &ft.buf_remote_to_peer;
-
-							if (dst != -1)
-							{
-								while (!outbuf->empty())
-								{
-									ssize_t sent = send(dst, outbuf->c_str(), outbuf->size(), 0);
-									if (sent > 0)
-										outbuf->erase(0, sent);
-									else if (sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
-									{
-										// no podemos escribir ahora, asegurarnos de vigilar POLLOUT del dst
-										size_t j = 0;
-										while (j < _fds.size())
-										{
-											if (_fds[j].fd == dst)
-											{
-												_fds[j].events |= POLLOUT;
-												break;
-											}
-											++j;
-										}
-										break;
-									}
-									else
-									{
-										// error en send -> cerrar transferencia
-										ft.closeAll();
-										break;
-									}
-								}
-							}
-						}
-						else if (rn == 0)
-						{
-							// EOF: cerrar transferencia
-							ft.closeAll();
-						}
-						else
-						{
-							// error no bloqueante: si no es EAGAIN/EWOULDBLOCK/EINTR -> cerrar
-							if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
-								ft.closeAll();
-						}
-						++i;
-						continue;
-					}
-
-					// 3) POLLOUT: intentar vaciar buffers si hay POLLOUT para este fd
-					if ((isPeer || isRemote) && (_fds[i].revents & POLLOUT))
-					{
-						// Nota: POLLOUT en 'peer' indica que intentamos enviar hacia peer
-						std::string *outbuf;
-						if (isPeer)
-							outbuf = &ft.buf_remote_to_peer;
-						else
-							outbuf = &ft.buf_peer_to_remote;
-
-						while (!outbuf->empty())
-						{
-							ssize_t sent = send(curFd, outbuf->c_str(), outbuf->size(), 0);
-							if (sent > 0)
-								outbuf->erase(0, sent);
-							else if (sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
-								break;
-							else
-							{
-								ft.closeAll();
-								break;
-							}
-						}
-						// Si ya vaciamos el buffer, quitar POLLOUT de events
-						if (outbuf->empty())
-							_fds[i].events &= ~POLLOUT;
-						++i;
-						continue;
-					}
-
-					// 4) Si la transferencia ya no está activa -> limpiar mappings y entradas en _fds
-					if (!ft.isActive())
-					{
-						// borrar fds asociados del vector _fds y del map _fdToTransferId
-						size_t k = 0;
-						while (k < _fds.size())
-						{
-							int fdk = _fds[k].fd;
-							if (fdk == ft.listenerFd || fdk == ft.peerFd || fdk == ft.remoteFd)
-							{
-								_fdToTransferId.erase(fdk);
-								// cerrar por seguridad si queda abierto (comprobar fd válido)
-								if (fdk >= 0)
-									close(fdk);
-								_fds.erase(_fds.begin() + k);
-								continue; // no incrementar k
-							}
-							++k;
-						}
-						_transfers.erase(tid);
-						++i;
-						continue;
-					}
-
-					// si llegamos aquí no era un evento relevante para la transferencia (seguir con el flujo normal)
-				}
-			}
+			if (handleFileTransferEvent(i))
+				continue;
 
 			/*Error o desconexión en un cliente o en el servidor 
 			POLLERR=conexion rota, POLLHUP=cierras la terminal, POLLNVAL=fd corrupto*/
@@ -447,49 +282,7 @@ int Server::runLoop()
 				}
 
 				// Antes de cerrar, limpiar transfers que referencien este cliente como sender/receiver
-				std::vector<unsigned long> toEraseTids;
-				std::map<unsigned long, FileTransfer>::iterator ittr = _transfers.begin();
-				while (ittr != _transfers.end())
-				{
-					unsigned long candTid = ittr->first;
-					FileTransfer &cand = ittr->second;
-					if (cand.senderFd == badfd || cand.receiverFd == badfd)
-					{
-						// capturar fds previo al closeAll
-						int lfd = cand.listenerFd;
-						int pfd = cand.peerFd;
-						int rfd = cand.remoteFd;
-
-						// cerrar recursos
-						cand.closeAll();
-
-						// borrar mappings por seguridad
-						if (lfd != -1) _fdToTransferId.erase(lfd);
-						if (pfd != -1) _fdToTransferId.erase(pfd);
-						if (rfd != -1) _fdToTransferId.erase(rfd);
-
-						// quitar fds de _fds si estaban presentes
-						size_t kk = 0;
-						while (kk < _fds.size())
-						{
-							int fdk = _fds[kk].fd;
-							if (fdk == lfd || fdk == pfd || fdk == rfd)
-							{
-								// cerrar por si acaso
-								if (fdk >= 0) close(fdk);
-								_fds.erase(_fds.begin() + kk);
-								continue;
-							}
-							++kk;
-						}
-
-						toEraseTids.push_back(candTid);
-					}
-					++ittr;
-				}
-				// borrar transfers recogidos
-				for (size_t x = 0; x < toEraseTids.size(); ++x)
-					_transfers.erase(toEraseTids[x]);
+				cleanupTransfersForClient(badfd);
 
 				// Ahora cerramos y borramos el cliente (como antes)
 				std::cout << "Cliente (fd " << badfd << ") se desconectó/err\n";
@@ -561,24 +354,12 @@ int Server::runLoop()
 
 						std::cout << "fd " << clientFd << " -> Línea recibida: [" << line << "]\n";
 
-						/* ================= FASE DE AUTENTICACIÓN ================= */
-						/* Ahora el orden no importa.
-							Permitimos recibir PASS, NICK, USER en cualquier orden.
-							El cliente solo queda registrado cuando tiene:
-							- PASS correcto
-							- NICK
-							- USER
-						*/
 						if (!_clients[clientFd].registered)
 						{
 							// Siempre permitir PASS y CAP antes del registro
 							handleInitialAuthentication(i, line);
 
-							/* ---------------------------------------------------------
-							Cliente NO registrado aún.
-							Procesamos NICK y USER en cualquier orden.
-							--------------------------------------------------------- */
-
+							// Cliente NO registrado aún.
 							if (line.compare(0, 5, "NICK ") == 0)
 								handleNickCommand(clientFd, line);
 							else if (line.compare(0, 5, "USER ") == 0)
@@ -713,44 +494,7 @@ int Server::runLoop()
 					std::cout << "Cliente (fd " << closedFd << ") cerró conexión\n";
 
 					// Limpiar transfers que referencien este cliente como sender/receiver
-					std::vector<unsigned long> toEraseTids;
-					std::map<unsigned long, FileTransfer>::iterator ittr2 = _transfers.begin();
-					while (ittr2 != _transfers.end())
-					{
-						unsigned long candTid = ittr2->first;
-						FileTransfer &cand = ittr2->second;
-						if (cand.senderFd == closedFd || cand.receiverFd == closedFd)
-						{
-							int lfd = cand.listenerFd;
-							int pfd = cand.peerFd;
-							int rfd = cand.remoteFd;
-
-							cand.closeAll();
-
-							if (lfd != -1) _fdToTransferId.erase(lfd);
-							if (pfd != -1) _fdToTransferId.erase(pfd);
-							if (rfd != -1) _fdToTransferId.erase(rfd);
-
-							// borrar esos fds del vector _fds
-							size_t kk = 0;
-							while (kk < _fds.size())
-							{
-								int fdk = _fds[kk].fd;
-								if (fdk == lfd || fdk == pfd || fdk == rfd)
-								{
-									if (fdk >= 0) close(fdk);
-									_fds.erase(_fds.begin() + kk);
-									continue;
-								}
-								++kk;
-							}
-
-							toEraseTids.push_back(candTid);
-						}
-						++ittr2;
-					}
-					for (size_t x = 0; x < toEraseTids.size(); ++x)
-						_transfers.erase(toEraseTids[x]);
+					cleanupTransfersForClient(closedFd);
 
 					// ahora cerrar y borrar cliente
 					close(closedFd);
@@ -766,43 +510,7 @@ int Server::runLoop()
 						std::cerr << "ERROR: recv falló\n";
 						int bad = clientFd;
 						// limpiar transfers asociados igual que en EOF
-						std::vector<unsigned long> toEraseTids;
-						std::map<unsigned long, FileTransfer>::iterator ittr3 = _transfers.begin();
-						while (ittr3 != _transfers.end())
-						{
-							unsigned long candTid = ittr3->first;
-							FileTransfer &cand = ittr3->second;
-							if (cand.senderFd == bad || cand.receiverFd == bad)
-							{
-								int lfd = cand.listenerFd;
-								int pfd = cand.peerFd;
-								int rfd = cand.remoteFd;
-
-								cand.closeAll();
-
-								if (lfd != -1) _fdToTransferId.erase(lfd);
-								if (pfd != -1) _fdToTransferId.erase(pfd);
-								if (rfd != -1) _fdToTransferId.erase(rfd);
-
-								size_t kk = 0;
-								while (kk < _fds.size())
-								{
-									int fdk = _fds[kk].fd;
-									if (fdk == lfd || fdk == pfd || fdk == rfd)
-									{
-										if (fdk >= 0) close(fdk);
-										_fds.erase(_fds.begin() + kk);
-										continue;
-									}
-									++kk;
-								}
-
-								toEraseTids.push_back(candTid);
-							}
-							++ittr3;
-						}
-						for (size_t x = 0; x < toEraseTids.size(); ++x)
-							_transfers.erase(toEraseTids[x]);
+						cleanupTransfersForClient(bad);
 
 						// cerrar el cliente problemático
 						close(clientFd);
@@ -847,43 +555,7 @@ int Server::runLoop()
 						_fdToTransferId.erase(badfd);
 
 						// limpiar transfers relacionados (igual que antes)
-						std::vector<unsigned long> toEraseTids;
-						std::map<unsigned long, FileTransfer>::iterator ittr4 = _transfers.begin();
-						while (ittr4 != _transfers.end())
-						{
-							unsigned long candTid = ittr4->first;
-							FileTransfer &cand = ittr4->second;
-							if (cand.senderFd == badfd || cand.receiverFd == badfd)
-							{
-								int lfd = cand.listenerFd;
-								int pfd = cand.peerFd;
-								int rfd = cand.remoteFd;
-
-								cand.closeAll();
-
-								if (lfd != -1) _fdToTransferId.erase(lfd);
-								if (pfd != -1) _fdToTransferId.erase(pfd);
-								if (rfd != -1) _fdToTransferId.erase(rfd);
-
-								size_t kk = 0;
-								while (kk < _fds.size())
-								{
-									int fdk = _fds[kk].fd;
-									if (fdk == lfd || fdk == pfd || fdk == rfd)
-									{
-										if (fdk >= 0) close(fdk);
-										_fds.erase(_fds.begin() + kk);
-										continue;
-									}
-									++kk;
-								}
-
-								toEraseTids.push_back(candTid);
-							}
-							++ittr4;
-						}
-						for (size_t x = 0; x < toEraseTids.size(); ++x)
-							_transfers.erase(toEraseTids[x]);
+						cleanupTransfersForClient(badfd);
 
 						// quitar entrada de _fds correspondiente al cliente (ya cerrada arriba)
 						_fds.erase(_fds.begin() + i);

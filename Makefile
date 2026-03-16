@@ -3,10 +3,10 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: victor <victor@student.42.fr>              +#+  +:+       +#+         #
+#    By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/12/02 11:18:27 by victor            #+#    #+#              #
-#    Updated: 2026/03/16 12:00:15 by victor           ###   ########.fr        #
+#    Updated: 2026/03/16 14:17:13 by vdiez-cu         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -20,7 +20,8 @@ SRCS		= main.cpp \
 			ServerOperatorsCommands.cpp \
 			ServerCommandsModeFlags.cpp \
 			ServerUtils.cpp \
-			FileTransfer.cpp
+			FileTransfer.cpp \
+			ServerFileTransfer.cpp
 
 HEADERS	= Client.hpp \
 			Server.hpp \
