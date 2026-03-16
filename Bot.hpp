@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Bot.hpp                                            :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 15:04:46 by sofernan          #+#    #+#             */
-/*   Updated: 2026/03/16 18:20:35 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/16 22:21:48 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,6 +23,8 @@ class Bot
 
 	public:
 		Bot();
+		Bot(const Bot &other);
+		Bot &operator=(const Bot &other);
 		~Bot();
 
 		const std::string &getName() const;

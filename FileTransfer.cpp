@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   FileTransfer.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/16 17:00:33 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 22:36:59 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -195,7 +195,6 @@ void FileTransfer::closeAll()
 	senderClosed = true;
 	receiverClosed = true;
 	finished = true;
-	std::cout << "DEBUG: closing FileTransfer id=" << id << " bytesTransferred=" << bytesTransferred << "\n";
 }
 
 /* Saber si sigue activa */

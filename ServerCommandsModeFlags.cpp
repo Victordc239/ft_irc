@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommandsModeFlags.cpp                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 14:47:22 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 16:41:45 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 22:44:09 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -253,7 +253,6 @@ void Server::mode_user(int clientFd, const std::string &target, const std::strin
 		{
 			_clients[clientFd].invisible = plus;
 
-			// mensaje de debug indicando el estado del modo invisible
 			if (plus)
 				std::cout << "fd " << clientFd << "Usuario " << myNick << " ahora es invisible\n";
 			else

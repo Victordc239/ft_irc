@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 17:14:18 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 23:03:22 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -58,6 +58,7 @@ class Server
 		void	handleJoinCommand(int clientFd, const std::string &line);
 		void	handlePartCommand(int clientFd, const std::string &line);
 		void	handlePrivmsgCommand(int clientFd, const std::string &line);
+		bool	handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string &text, const std::string &prefix, const std::string &target);
 		void	handleKickCommand(int clientFd, const std::string &line);
 		void	handleInviteCommand(int clientFd, const std::string &line);
 		void	handleTopicCommand(int clientFd, const std::string &line);
@@ -68,8 +69,11 @@ class Server
 		void	mode_o(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &targetNick, const std::string &prefix);
 		void	mode_l(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &param, const std::string &prefix);
 		void	mode_user(int clientFd, const std::string &target, const std::string &rest);
-		bool handleFileTransferEvent(size_t &i);
-		void cleanupTransfersForClient(int badfd);
+		bool	handleFileTransferEvent(size_t &i);
+		bool	flushBufferToFd(std::vector<struct pollfd> &fds, FileTransfer &ft, std::string &buffer, int dst, bool countBytes);
+		void	setPollEvents(std::vector<struct pollfd> &fds, int fd, short events);
+		void	removePollFd(std::vector<struct pollfd> &fds, int fd);
+		void	cleanupTransfersForClient(int badfd);
 
 	public:
 		Server();

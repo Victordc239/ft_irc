@@ -3,17 +3,17 @@
 /*                                                        :::      ::::::::   */
 /*   ServerFileTransfer.cpp                             :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 14:14:47 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 17:01:04 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 23:03:46 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
 /* Pequeños helpers internos para no repetir código */
-static void	removePollFd(std::vector<struct pollfd> &fds, int fd)
+void	Server::removePollFd(std::vector<struct pollfd> &fds, int fd)
 {
 	size_t i = 0;
 	while (i < fds.size())
@@ -27,7 +27,7 @@ static void	removePollFd(std::vector<struct pollfd> &fds, int fd)
 	}
 }
 
-static void	setPollEvents(std::vector<struct pollfd> &fds, int fd, short events)
+void	Server::setPollEvents(std::vector<struct pollfd> &fds, int fd, short events)
 {
 	size_t i = 0;
 	while (i < fds.size())
@@ -41,7 +41,7 @@ static void	setPollEvents(std::vector<struct pollfd> &fds, int fd, short events)
 	}
 }
 
-static bool	flushBufferToFd(std::vector<struct pollfd> &fds, FileTransfer &ft, std::string &buffer, int dst, bool countBytes, const char *debugTag)
+bool	Server::flushBufferToFd(std::vector<struct pollfd> &fds, FileTransfer &ft, std::string &buffer, int dst, bool countBytes)
 {
 	if (dst == -1)
 		return (true);
@@ -54,21 +54,16 @@ static bool	flushBufferToFd(std::vector<struct pollfd> &fds, FileTransfer &ft, s
 			if (countBytes)
 				ft.bytesTransferred += (unsigned long)sent;
 			buffer.erase(0, sent);
-			std::cout << "DEBUG: ft id=" << ft.id << " forwarded " << sent << " bytes to fd=" << dst;
-			if (debugTag != NULL)
-				std::cout << " (" << debugTag << ")";
-			std::cout << " total_forwarded=" << ft.bytesTransferred << "\n";
 		}
 		else if (sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
 		{
 			// no podemos escribir ahora, asegurarnos de vigilar POLLOUT del dst
 			setPollEvents(fds, dst, POLLIN | POLLOUT);
-			std::cout << "DEBUG: ft id=" << ft.id << " send would block, registered POLLOUT for fd=" << dst << "\n";
 			return (true);
 		}
 		else
 		{
-			std::cerr << "DEBUG: ft id=" << ft.id << " send error to fd=" << dst << " errno=" << errno << " (" << strerror(errno) << ")\n";
+			std::cerr << "Error\n";
 			return (false);
 		}
 	}
@@ -101,7 +96,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 			// mapping huérfano -> limpiar y seguir
 			_fdToTransferId.erase(itmap);
 			++i;
-			return true;
+			return (true);
 		}
 		FileTransfer &ft = itft->second;
 
@@ -155,11 +150,8 @@ bool Server::handleFileTransferEvent(size_t &i)
 						// Intentar vaciar lo que ya hubiese llegado del sender antes de que el receptor entrase
 						if (!ft.buf_peer_to_remote.empty())
 						{
-							std::cout << "DEBUG: ft id=" << ft.id << " flush pending sender->receiver buffer after accept\n";
-							if (!flushBufferToFd(_fds, ft, ft.buf_peer_to_remote, ft.receiverFdRedDDC, true, "pending peer->remote"))
-							{
+							if (!flushBufferToFd(_fds, ft, ft.buf_peer_to_remote, ft.receiverFdRedDDC, true))
 								ft.closeAll();
-							}
 						}
 
 						// opcional: notificar al sender si está conectado
@@ -174,7 +166,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 				}
 			}
 			++i;
-			return true;
+			return (true);
 		}
 
 		// 2) Completado de conexión no bloqueante del sender
@@ -184,30 +176,29 @@ bool Server::handleFileTransferEvent(size_t &i)
 			socklen_t errlen = sizeof(err);
 			if (getsockopt(curFd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1 || err != 0)
 			{
-				std::cerr << "DEBUG: ft id=" << ft.id << " sender connect failed on fd=" << curFd << " errno=" << err << " (" << strerror(err) << ")\n";
+				std::cerr << "ERROR: ft id=" << ft.id << " sender connect failed on fd=" << curFd << " errno=" << err << " (" << strerror(err) << ")\n";
 				ft.closeAll();
 				++i;
-				return true;
+				return (true);
 			}
 
 			// Ya quedó conectado: dejamos de vigilar POLLOUT y pasamos a POLLIN
 			setPollEvents(_fds, curFd, POLLIN);
-			ft.bothConnected = (ft.receiverFdRedDDC != -1);
 
-			std::cout << "DEBUG: ft id=" << ft.id << " sender connection established fd=" << curFd << "\n";
+			if (ft.receiverFdRedDDC != -1)
+				ft.bothConnected = true;
+			else
+				ft.bothConnected = false;
 
 			// Si ya había datos esperando del sender y el receptor ya está listo, intentamos enviarlos
 			if (ft.receiverFdRedDDC != -1 && !ft.buf_peer_to_remote.empty())
 			{
-				std::cout << "DEBUG: ft id=" << ft.id << " flush pending sender->receiver buffer after sender connect\n";
-				if (!flushBufferToFd(_fds, ft, ft.buf_peer_to_remote, ft.receiverFdRedDDC, true, "peer->remote"))
-				{
+				if (!flushBufferToFd(_fds, ft, ft.buf_peer_to_remote, ft.receiverFdRedDDC, true))
 					ft.closeAll();
-				}
 			}
 
 			++i;
-			return true;
+			return (true);
 		}
 
 		// 3) Relay: lectura en peer o remote
@@ -227,10 +218,6 @@ bool Server::handleFileTransferEvent(size_t &i)
 		{
 			char tmpbuf[4096];
 			ssize_t rn = recv(curFd, tmpbuf, sizeof(tmpbuf), 0);
-
-			// DEBUG: mostrar bytes leídos y de qué extremo vienen
-			if (rn > 0)
-				std::cout << "DEBUG: ft id=" << ft.id << " recv " << rn << " bytes from " << (isPeer ? "peer" : "remote") << " fd=" << curFd << "\n";
 
 			if (rn > 0)
 			{
@@ -254,10 +241,6 @@ bool Server::handleFileTransferEvent(size_t &i)
 				else
 					outbuf = &ft.buf_remote_to_peer;
 
-				// DEBUG: tamaño del buffer antes de intentar enviar
-				if (!outbuf->empty())
-					std::cout << "DEBUG: ft id=" << ft.id << " buffer_size(before send) = " << outbuf->size() << " (from " << (isPeer ? "peer" : "remote") << ")\n";
-
 				if (dst != -1)
 				{
 					// Los datos del sender son los que representan el archivo real,
@@ -265,26 +248,18 @@ bool Server::handleFileTransferEvent(size_t &i)
 					bool countBytes = false;
 					if (isPeer)
 						countBytes = true;
+					else
+						countBytes = false;
 
-					if (!flushBufferToFd(_fds, ft, *outbuf, dst, countBytes, (isPeer ? "peer->remote" : "remote->peer")))
-					{
+					if (!flushBufferToFd(_fds, ft, *outbuf, dst, countBytes))
 						ft.closeAll();
-					}
-				}
-				else
-				{
-					// dst todavía no está listo, guardamos el buffer para más tarde
-					std::cerr << "DEBUG: ft id=" << ft.id << " dst == -1, cannot forward (buffer kept)\n";
 				}
 			}
 			else if (rn == 0)
 			{
-				// EOF: cerrar solo el lado que hizo EOF, no toda la transferencia
-				std::cout << "DEBUG: ft id=" << ft.id << " recv EOF on fd=" << curFd << "\n";
-
 				if (isPeer)
 				{
-					// El sender cerró: cerramos solo ese socket y esperamos a drenar el buffer pendiente
+					// El sender cerró: cerramos solo ese socket y esperamos a dranar el buffer pendiente
 					if (ft.senderFdRedDDC != -1)
 					{
 						_fdToTransferId.erase(ft.senderFdRedDDC);
@@ -307,12 +282,12 @@ bool Server::handleFileTransferEvent(size_t &i)
 				// error no bloqueante: si no es EAGAIN/EWOULDBLOCK/EINTR -> cerrar
 				if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
 				{
-					std::cerr << "DEBUG: ft id=" << ft.id << " recv error errno=" << errno << " (" << strerror(errno) << ")\n";
+					std::cerr << "ERROR: ft id=" << ft.id << " recv error errno=" << errno << " (" << strerror(errno) << ")\n";
 					ft.closeAll();
 				}
 			}
 			++i;
-			return true;
+			return (true);
 		}
 
 		// 4) POLLOUT: intentar vaciar buffers si hay POLLOUT para este fd
@@ -333,21 +308,15 @@ bool Server::handleFileTransferEvent(size_t &i)
 				countBytes = true;
 			}
 
-			// DEBUG: mostrar que vamos a vaciar el buffer y su tamaño actual
-			if (!outbuf->empty())
-				std::cout << "DEBUG: ft id=" << ft.id << " POLLOUT on fd=" << curFd << " buffer_size(before POLLOUT send)=" << outbuf->size() << "\n";
-
-			if (!flushBufferToFd(_fds, ft, *outbuf, curFd, countBytes, (isPeer ? "remote->peer" : "peer->remote")))
-			{
+			if (!flushBufferToFd(_fds, ft, *outbuf, curFd, countBytes))
 				ft.closeAll();
-			}
 
 			// Si ya vaciamos el buffer, quitar POLLOUT de events
 			if (outbuf->empty())
 				setPollEvents(_fds, curFd, POLLIN);
 
 			++i;
-			return true;
+			return (true);
 		}
 
 		// 5) Si la transferencia ya no está activa -> limpiar mappings y entradas en _fds
@@ -371,14 +340,13 @@ bool Server::handleFileTransferEvent(size_t &i)
 			}
 			_transfers.erase(tid);
 			++i;
-			return true;
+			return (true);
 		}
 
 		// si llegamos aquí no era un evento relevante para la transferencia (seguir con el flujo normal)
 	}
-	return false;
+	return (false);
 }
-
 
 /* Limpia todas las transfers que referencien al cliente badfd.
    Esta lógica estaba duplicada varias veces en runLoop; la centralizamos aquí.
@@ -441,3 +409,5 @@ void Server::cleanupTransfersForClient(int badfd)
 		++x;
 	}
 }
+
+
