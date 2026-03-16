@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 15:04:46 by sofernan          #+#    #+#             */
-/*   Updated: 2026/03/16 16:44:49 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/16 18:20:35 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,7 +26,7 @@ class Bot
 		~Bot();
 
 		const std::string &getName() const;
-		std::string generateReply(const std::string &msg, const std::string &nick, const std::string &channel, std::string &kickTarget);
+		std::string generateReply(const std::string &cmd, const std::string &nick);
 };
 
 #endif
