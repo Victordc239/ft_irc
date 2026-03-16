@@ -3,10 +3,10 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+         #
+#    By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/12/02 11:18:27 by victor            #+#    #+#              #
-#    Updated: 2026/03/16 14:17:13 by vdiez-cu         ###   ########.fr        #
+#    Updated: 2026/03/16 16:59:34 by sofernan         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -21,12 +21,14 @@ SRCS		= main.cpp \
 			ServerCommandsModeFlags.cpp \
 			ServerUtils.cpp \
 			FileTransfer.cpp \
-			ServerFileTransfer.cpp
+			ServerFileTransfer.cpp \
+			Bot.cpp
 
 HEADERS	= Client.hpp \
 			Server.hpp \
 			Channel.hpp \
-			FileTransfer.hpp
+			FileTransfer.hpp \
+			Bot.hpp
 
 OBJS		= $(SRCS:.cpp=.o)
 
