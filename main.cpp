@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 15:51:36 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 16:27:20 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 10:49:24 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,6 +32,7 @@ int main(int argc, char **argv)
 	//manejar señales de interrupcion
 	signal(SIGINT, sigint_handler); //Ctrl+C
 	signal(SIGQUIT, sigint_handler); /*Ctrl+\ */
+	signal(SIGTSTP, sigint_handler); // Ctrl+Z
 	signal(SIGTERM, sigint_handler); // kill, systemd stops, etc
 	signal(SIGPIPE, SIG_IGN); // Escribir a socket cerrado
 

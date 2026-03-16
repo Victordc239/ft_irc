@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 15:04:35 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 11:25:01 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,6 +29,7 @@
 #include <climits>
 #include "Client.hpp"
 #include "Channel.hpp"
+#include "FileTransfer.hpp"
 
 extern volatile sig_atomic_t g_running;
 
@@ -42,6 +43,9 @@ class Server
 		char _buf[512];
 		std::map<int, Client> _clients;
 		std::map<std::string, Channel> _channels;
+		std::map<unsigned long, FileTransfer> _transfers;
+		unsigned long _nextTransferId;
+		std::map<int, unsigned long> _fdToTransferId; // fd -> transfer id
 
 		bool	nickInUse(const std::string &nick) const;
 		void	sendNumeric(int fd, const std::string &msg);

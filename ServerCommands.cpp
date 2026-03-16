@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 16:41:45 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 12:04:25 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -455,7 +455,6 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 	if (channel.clients.empty())
 		_channels.erase(it);
 }
-
 void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 {
 	// Formato: "PRIVMSG <target> :<message>"
@@ -466,6 +465,7 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 		return;
 	}
 
+	// localizar espacio tras "PRIVMSG "
 	size_t space = line.find(' ', prefix_len);
 	if (space == std::string::npos)
 	{
@@ -473,21 +473,22 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 		return;
 	}
 
+	// extraer target (nick o canal)
 	std::string target = line.substr(prefix_len, space - prefix_len);
 
-	// Trim target por si acaso
+	// trim target por seguridad (inicio / fin)
 	while (!target.empty() && (target[0] == ' ' || target[0] == '\t'))
 		target.erase(0, 1);
 	while (!target.empty() && (target[target.size() - 1] == ' ' || target[target.size() - 1] == '\t'))
 		target.erase(target.size() - 1, 1);
 
-	// message puede empezar con ':' después del espacio; buscamos ':' tras el target
+	// localizar ':' que inicia el texto del mensaje
 	size_t colon = line.find(':', space + 1);
 	std::string text;
 
 	if (colon == std::string::npos)
 	{
-		// No hay ':' — no message
+		// No hay texto
 		sendNumeric(clientFd, "412 :No text to send");
 		return;
 	}
@@ -502,9 +503,8 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 	}
 
 	/* ===========================================================
-	   Construcción del prefijo IRC correcto
+	   Construcción del prefijo IRC del emisor (nick!user@host)
 	   =========================================================== */
-
 	std::string nick = _clients[clientFd].nickname;
 	std::string user = _clients[clientFd].username;
 
@@ -516,10 +516,11 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 
 	std::string prefix = nick + "!" + user + "@localhost";
 
-	// Mensaje a canal
+	/* ===========================================================
+	   Si target es canal: reenviar como antes (sin DCC)
+	   =========================================================== */
 	if (!target.empty() && (target[0] == '#' || target[0] == '&' || target[0] == '+' || target[0] == '!'))
 	{
-		// existe el canal?
 		std::map<std::string, Channel>::iterator channelIterator = _channels.find(target);
 		if (channelIterator == _channels.end())
 		{
@@ -529,27 +530,23 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 
 		Channel &channel = channelIterator->second;
 
-		// el cliente está en el canal?
 		if (!channel.hasClient(clientFd))
 		{
 			sendNumeric(clientFd, "442 " + target + " :You're not on that channel");
 			return;
 		}
 
-		// reenviar a todos los clientes del canal (excepto el emisor)
 		std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
 
 		std::set<int>::iterator it = channel.clients.begin();
 		while (it != channel.clients.end())
 		{
 			int fd = *it;
-			// evitar enviar al emisor
 			if (fd == clientFd)
 			{
 				++it;
 				continue;
 			}
-			// comprueba que el fd sigue en la tabla de clientes
 			if (_clients.find(fd) == _clients.end())
 			{
 				++it;
@@ -558,21 +555,141 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 			sendNumeric(fd, out);
 			++it;
 		}
+		return;
 	}
-	else
+
+	/* ===========================================================
+	   Si target es usuario -> comprobar DCC (CTCP dentro del PRIVMSG)
+	   Nota: /dcc send del cliente se traduce en un PRIVMSG con CTCP:
+	         PRIVMSG nick :\001DCC SEND <file> <ip> <port> <size>\001
+	   =========================================================== */
+
+	int dst_fd = getFdByNick(target);
+	if (dst_fd == -1)
 	{
-		// Mensaje privado a nick
-		int dst_fd = getFdByNick(target);
-
-		if (dst_fd == -1)
-		{
-			sendNumeric(clientFd, "401 " + target + " :No such nick");
-			return;
-		}
-
-		std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
-
-		std::cout << "PRIVMSG: enviando PRIVMSG de fd " << clientFd << " a fd " << dst_fd << " msg=[" << out << "]\n";
-		sendNumeric(dst_fd, out);
+		sendNumeric(clientFd, "401 " + target + " :No such nick");
+		return;
 	}
+
+	// Si el texto comienza con 0x01 (CTCP) y contiene "DCC SEND " en la posición 1,
+	// lo consideramos una petición DCC SEND que podemos interceptar.
+	if (!text.empty() && text[0] == '\001')
+	{
+		const std::string dccPrefix = "DCC SEND ";
+		size_t pos = text.find(dccPrefix, 1); // buscar a partir de la posición 1 (tras \001)
+		if (pos == 1)
+		{
+			// Extraer la porción después de "DCC SEND "
+			size_t start = pos + dccPrefix.size(); // inicio de los tokens: filename ip port size
+			std::string rest = "";
+			if (start < text.size())
+				rest = text.substr(start);
+
+			// quitar un posible \001 final
+			if (!rest.empty() && rest[rest.size() - 1] == '\001')
+				rest.erase(rest.size() - 1);
+
+			// Tokenizar rest por espacios de forma manual:
+			std::vector<std::string> toks;
+			std::string s = rest;
+			while (!s.empty())
+			{
+				// saltar espacios iniciales
+				while (!s.empty() && (s[0] == ' ' || s[0] == '\t'))
+					s.erase(0, 1);
+				if (s.empty())
+					break;
+				size_t p = s.find(' ');
+				if (p == std::string::npos)
+				{
+					toks.push_back(s);
+					break;
+				}
+				toks.push_back(s.substr(0, p));
+				s.erase(0, p + 1);
+			}
+
+			// Esperamos al menos el filename (toks[0]). ip/port/size son opcionales
+			if (!toks.empty())
+			{
+				std::string filename = toks[0];
+				unsigned long fsize = 0;
+				// si nos dan size (habitualmente en toks[3]) intentamos parsearlo
+				if (toks.size() >= 4)
+				{
+					char *endptr = NULL;
+					fsize = (unsigned long)ftStrtol(toks[3].c_str(), &endptr);
+					if (*endptr != '\0')
+						fsize = 0; // parse error -> 0
+				}
+
+				// Construir la transferencia y crear listener (proxy)
+				FileTransfer ft;
+				ft.id = _nextTransferId++;
+				ft.senderFd = clientFd;
+				ft.receiverFd = dst_fd;
+				ft.filename = filename;
+				ft.filesize = fsize;
+
+				// Intentar crear el listener (ephemeral port)
+				if (ft.createListener() != 0)
+				{
+					// fallo: avisar al emisor y reenviar el PRIVMSG original como fallback
+					sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy failed to create listener");
+					std::string fallback = ":" + prefix + " PRIVMSG " + target + " :" + text;
+					sendNumeric(dst_fd, fallback);
+					return;
+				}
+
+				// Guardar la transferencia en el mapa del servidor (se hace la copia de metadata,
+				// la instancia almacenada será la que posea los fds reales)
+				_transfers[ft.id] = ft;
+				int lfd = _transfers[ft.id].listenerFd;
+
+				// Añadir listener al array de poll para que runLoop() lo gestione
+				pollfd pfd; pfd.fd = lfd; pfd.events = POLLIN; pfd.revents = 0;
+				_fds.push_back(pfd);
+
+				// Mapear el fd del listener a la transferencia
+				_fdToTransferId[lfd] = ft.id;
+
+				// Obtener IP del servidor para enviar al receptor (si no se puede, usar 127.0.0.1)
+				std::string serverIp = "127.0.0.1";
+				if (_server_fd != -1)
+				{
+					struct sockaddr_in sin;
+					socklen_t slen = sizeof(sin);
+					if (getsockname(_server_fd, (struct sockaddr *)&sin, &slen) != -1)
+					{
+						char ipbuf[INET_ADDRSTRLEN];
+						if (inet_ntop(AF_INET, &sin.sin_addr, ipbuf, sizeof(ipbuf)) != NULL)
+							serverIp = ipbuf;
+					}
+				}
+
+				// Construir el CTCP DCC SEND modificado para el receptor (le decimos que se conecte al servidor)
+				unsigned short port = _transfers[ft.id].getListenerPort();
+				std::string dccmsg = "\001DCC SEND " + filename + " " + serverIp + " " + intToString((int)port) + " " + intToString((int)fsize) + "\001";
+				std::string outmsg = ":" + prefix + " PRIVMSG " + target + " :" + dccmsg;
+
+				// Enviar al receptor el CTCP con IP/puerto del proxy
+				sendNumeric(dst_fd, outmsg);
+
+				// Informar al emisor (opcional, mensaje NOTICE)
+				std::string senderNick = _clients[clientFd].nickname;
+				if (senderNick.empty())
+					senderNick = intToString(clientFd);
+				sendNumeric(clientFd, ":ircserv NOTICE " + senderNick + " :DCC proxy created id=" + intToString((int)ft.id));
+
+				// Fin: no reenviamos el PRIVMSG original (interceptado)
+				return;
+			}
+		}
+	}
+
+	// Si no era un DCC SEND o el parse falló -> reenviar PRIVMSG clásico al destinatario
+	std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
+
+	std::cout << "PRIVMSG: enviando PRIVMSG de fd " << clientFd << " a fd " << dst_fd << " msg=[" << out << "]\n";
+	sendNumeric(dst_fd, out);
 }
