@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:24 by victor            #+#    #+#             */
-/*   Updated: 2026/03/16 14:47:06 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 17:00:10 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,7 @@
 #define FILETRANSFER_HPP
 
 #include <string>
+#include <iostream>
 #include <ctime>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -42,6 +43,8 @@ class FileTransfer
 		bool listenerCreated;
 		bool bothConnected;
 		bool finished;
+		bool senderClosed;		// sender DDC cerró su conexión
+		bool receiverClosed;		// receiver DDC cerró su conexión
 		time_t startedAt;	// timestamp de inicio
 		time_t lastActivity;	// ultimo timestamp
 

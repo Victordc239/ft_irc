@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/16 14:47:06 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 17:00:33 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,8 @@ FileTransfer::FileTransfer()
 	buf_remote_to_peer = "";
 	listenerCreated = false;
 	bothConnected = false;
+	senderClosed = false;
+	receiverClosed = false;
 	finished = false;
 	startedAt = 0;
 	lastActivity = 0;
@@ -46,7 +48,9 @@ FileTransfer::FileTransfer(const FileTransfer &other)
 	buf_peer_to_remote = other.buf_peer_to_remote;
 	buf_remote_to_peer = other.buf_remote_to_peer;
 	listenerCreated = other.listenerCreated;
-	bothConnected = false;
+	bothConnected = other.bothConnected;
+	senderClosed = other.senderClosed;
+	receiverClosed = other.receiverClosed;
 	finished = other.finished;
 	startedAt = other.startedAt;
 	lastActivity = other.lastActivity;
@@ -71,7 +75,9 @@ FileTransfer &FileTransfer::operator=(const FileTransfer &other)
 		buf_peer_to_remote = other.buf_peer_to_remote;
 		buf_remote_to_peer = other.buf_remote_to_peer;
 		listenerCreated = other.listenerCreated;
-		bothConnected = false;
+		bothConnected = other.bothConnected;
+		senderClosed = other.senderClosed;
+		receiverClosed = other.receiverClosed;
 		finished = other.finished;
 		startedAt = other.startedAt;
 		lastActivity = other.lastActivity;
@@ -186,7 +192,10 @@ void FileTransfer::closeAll()
 	buf_remote_to_peer.clear();
 	listenerCreated = false;
 	bothConnected = false;
+	senderClosed = true;
+	receiverClosed = true;
 	finished = true;
+	std::cout << "DEBUG: closing FileTransfer id=" << id << " bytesTransferred=" << bytesTransferred << "\n";
 }
 
 /* Saber si sigue activa */
