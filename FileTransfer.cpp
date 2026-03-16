@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   FileTransfer.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/16 12:03:07 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/16 14:47:06 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,9 +17,9 @@ FileTransfer::FileTransfer()
 	id = 0;
 	senderFd = -1;
 	receiverFd = -1;
-	listenerFd = -1;
-	peerFd = -1;
-	remoteFd = -1;
+	socketFileTransfer = -1;
+	senderFdRedDDC = -1;
+	receiverFdRedDDC = -1;
 	filename = "";
 	filesize = 0;
 	bytesTransferred = 0;
@@ -37,9 +37,9 @@ FileTransfer::FileTransfer(const FileTransfer &other)
 	id = other.id;
 	senderFd = other.senderFd;
 	receiverFd = other.receiverFd;
-	listenerFd = -1;
-	peerFd = -1;
-	remoteFd = -1;
+	socketFileTransfer = -1;
+	senderFdRedDDC = -1;
+	receiverFdRedDDC = -1;
 	filename = other.filename;
 	filesize = other.filesize;
 	bytesTransferred = other.bytesTransferred;
@@ -62,9 +62,9 @@ FileTransfer &FileTransfer::operator=(const FileTransfer &other)
 		id = other.id;
 		senderFd = other.senderFd;
 		receiverFd = other.receiverFd;
-		listenerFd = -1;
-		peerFd = -1;
-		remoteFd = -1;
+		socketFileTransfer = -1;
+		senderFdRedDDC = -1;
+		receiverFdRedDDC = -1;
 		filename = other.filename;
 		filesize = other.filesize;
 		bytesTransferred = other.bytesTransferred;
@@ -88,33 +88,35 @@ int FileTransfer::setNonBlocking(int fd)
 {
 	int flags = fcntl(fd, F_GETFL, 0);
 	if (flags == -1)
-		return -1;
+		return (-1);
 	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-		return -1;
-	return 0;
+		return (-1);
+	return (0);
 }
 
 /* Crear listener para el proxy DCC */
 int FileTransfer::createListener()
 {
-	if (listenerFd != -1)
+	if (socketFileTransfer != -1)
 	{
-		close(listenerFd);
-		listenerFd = -1;
+		close(socketFileTransfer);
+		socketFileTransfer = -1;
 	}
 
-	listenerFd = socket(AF_INET, SOCK_STREAM, 0);
-	if (listenerFd < 0)
-		return -1;
+	socketFileTransfer = socket(AF_INET, SOCK_STREAM, 0);
+	if (socketFileTransfer < 0)
+		return (-1);
 
 	int opt = 1;
-	setsockopt(listenerFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+	setsockopt(socketFileTransfer, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)); 
+	/*socketFileTransfer=socket, SOL_SOCKET=aplica a todo el socket(no solo al puerto o ip o protocolo),
+	SO_REUSEADDR=permite reusar ip y puerto, &opt=activarlo, sizeof(opt)=tamaño valor*/
 
-	if (setNonBlocking(listenerFd) == -1)
+	if (setNonBlocking(socketFileTransfer) == -1)
 	{
-		close(listenerFd);
-		listenerFd = -1;
-		return -1;
+		close(socketFileTransfer);
+		socketFileTransfer = -1;
+		return (-1);
 	}
 
 	sockaddr_in addr;
@@ -123,18 +125,18 @@ int FileTransfer::createListener()
 	addr.sin_port = htons(0); // puerto automático
 	addr.sin_addr.s_addr = INADDR_ANY;
 
-	if (bind(listenerFd, (sockaddr *)&addr, sizeof(addr)) < 0)
+	if (bind(socketFileTransfer, (sockaddr *)&addr, sizeof(addr)) < 0)
 	{
-		close(listenerFd);
-		listenerFd = -1;
-		return -1;
+		close(socketFileTransfer);
+		socketFileTransfer = -1;
+		return (-1);
 	}
 
-	if (listen(listenerFd, 1) < 0)
+	if (listen(socketFileTransfer, 1) < 0)
 	{
-		close(listenerFd);
-		listenerFd = -1;
-		return -1;
+		close(socketFileTransfer);
+		socketFileTransfer = -1;
+		return (-1);
 	}
 
 	listenerCreated = true;
@@ -147,37 +149,37 @@ int FileTransfer::createListener()
 /* Obtener puerto asignado */
 unsigned short FileTransfer::getListenerPort() const
 {
-	if (listenerFd < 0)
-		return 0;
+	if (socketFileTransfer < 0)
+		return (0);
 
 	sockaddr_in addr;
 	socklen_t len = sizeof(addr);
 
-	if (getsockname(listenerFd, (sockaddr *)&addr, &len) == -1)
-		return 0;
+	if (getsockname(socketFileTransfer, (sockaddr *)&addr, &len) == -1)
+		return (0);
 
-	return ntohs(addr.sin_port);
+	return (ntohs(addr.sin_port));
 }
 
 /* Cerrar todos los sockets propietarios de la transferencia */
 void FileTransfer::closeAll()
 {
-	if (listenerFd != -1)
+	if (socketFileTransfer != -1)
 	{
-		close(listenerFd);
-		listenerFd = -1;
+		close(socketFileTransfer);
+		socketFileTransfer = -1;
 	}
 
-	if (peerFd != -1)
+	if (senderFdRedDDC != -1)
 	{
-		close(peerFd);
-		peerFd = -1;
+		close(senderFdRedDDC);
+		senderFdRedDDC = -1;
 	}
 
-	if (remoteFd != -1)
+	if (receiverFdRedDDC != -1)
 	{
-		close(remoteFd);
-		remoteFd = -1;
+		close(receiverFdRedDDC);
+		receiverFdRedDDC = -1;
 	}
 
 	buf_peer_to_remote.clear();
@@ -191,10 +193,10 @@ void FileTransfer::closeAll()
 bool FileTransfer::isActive() const
 {
 	if (finished)
-		return false;
+		return (false);
 
-	if (listenerFd != -1 || peerFd != -1 || remoteFd != -1)
-		return true;
+	if (socketFileTransfer != -1 || senderFdRedDDC != -1 || receiverFdRedDDC != -1)
+		return (true);
 
-	return false;
+	return (false);
 }

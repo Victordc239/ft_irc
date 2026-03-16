@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 14:14:47 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 14:16:43 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 14:47:06 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,11 +41,11 @@ bool Server::handleFileTransferEvent(size_t &i)
 		FileTransfer &ft = itft->second;
 
 		// 1) Listener accept: si el fd es el listener y hay POLLIN => accept()
-		if (curFd == ft.listenerFd && (_fds[i].revents & POLLIN))
+		if (curFd == ft.socketFileTransfer && (_fds[i].revents & POLLIN))
 		{
 			struct sockaddr_in peerAddr;
 			socklen_t alen = sizeof(peerAddr);
-			int newfd = accept(ft.listenerFd, (struct sockaddr*)&peerAddr, &alen);
+			int newfd = accept(ft.socketFileTransfer, (struct sockaddr*)&peerAddr, &alen);
 			if (newfd != -1)
 			{
 				if (Server::setNonblock(newfd) == -1)
@@ -55,11 +55,11 @@ bool Server::handleFileTransferEvent(size_t &i)
 				}
 				else
 				{
-					// asignar al primer slot libre (peerFd o remoteFd)
-					if (ft.peerFd == -1)
-						ft.peerFd = newfd;
-					else if (ft.remoteFd == -1)
-						ft.remoteFd = newfd;
+					// asignar al primer slot libre (senderFdRedDDC o receiverFdRedDDC)
+					if (ft.senderFdRedDDC == -1)
+						ft.senderFdRedDDC = newfd;
+					else if (ft.receiverFdRedDDC == -1)
+						ft.receiverFdRedDDC = newfd;
 					else
 					{
 						// ya hay dos extremos ocupados -> cerrar el excedente
@@ -79,7 +79,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 					}
 
 					// si ahora tenemos ambos extremos, marcar bothConnected y notificar
-					if (ft.peerFd != -1 && ft.remoteFd != -1)
+					if (ft.senderFdRedDDC != -1 && ft.receiverFdRedDDC != -1)
 					{
 						ft.bothConnected = true;
 						ft.lastActivity = std::time(NULL);
@@ -87,7 +87,8 @@ bool Server::handleFileTransferEvent(size_t &i)
 						if (_clients.find(ft.senderFd) != _clients.end())
 						{
 							std::string sNick = _clients[ft.senderFd].nickname;
-							if (sNick.empty()) sNick = intToString(ft.senderFd);
+							if (sNick.empty())
+								sNick = intToString(ft.senderFd);
 							sendNumeric(ft.senderFd, ":ircserv NOTICE " + sNick + " :DCC proxy connection established for id=" + intToString((int)ft.id));
 						}
 					}
@@ -98,8 +99,18 @@ bool Server::handleFileTransferEvent(size_t &i)
 		}
 
 		// 2) Relay: lectura en peer o remote
-		bool isPeer = (curFd == ft.peerFd);
-		bool isRemote = (curFd == ft.remoteFd);
+		bool isPeer;
+		if (curFd == ft.senderFdRedDDC)
+			isPeer = true;
+		else
+			isPeer = false;
+
+		bool isRemote;
+		if (curFd == ft.receiverFdRedDDC)
+			isRemote = true;
+		else
+			isRemote = false;
+
 		if ((isPeer || isRemote) && (_fds[i].revents & POLLIN))
 		{
 			char tmpbuf[4096];
@@ -115,9 +126,9 @@ bool Server::handleFileTransferEvent(size_t &i)
 				// intentar enviar inmediatamente al otro extremo
 				int dst;
 				if (isPeer)
-					dst = ft.remoteFd;
+					dst = ft.receiverFdRedDDC;
 				else
-					dst = ft.peerFd;
+					dst = ft.senderFdRedDDC;
 
 				std::string *outbuf;
 				if (isPeer)
@@ -157,10 +168,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 				}
 			}
 			else if (rn == 0)
-			{
-				// EOF: cerrar transferencia
-				ft.closeAll();
-			}
+				ft.closeAll(); // EOF: cerrar transferencia
 			else
 			{
 				// error no bloqueante: si no es EAGAIN/EWOULDBLOCK/EINTR -> cerrar
@@ -209,7 +217,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 			while (k < _fds.size())
 			{
 				int fdk = _fds[k].fd;
-				if (fdk == ft.listenerFd || fdk == ft.peerFd || fdk == ft.remoteFd)
+				if (fdk == ft.socketFileTransfer || fdk == ft.senderFdRedDDC || fdk == ft.receiverFdRedDDC)
 				{
 					_fdToTransferId.erase(fdk);
 					// cerrar por seguridad si queda abierto (comprobar fd válido)
@@ -248,17 +256,20 @@ void Server::cleanupTransfersForClient(int badfd)
 		if (cand.senderFd == badfd || cand.receiverFd == badfd)
 		{
 			// capturar fds previo al closeAll
-			int lfd = cand.listenerFd;
-			int pfd = cand.peerFd;
-			int rfd = cand.remoteFd;
+			int lfd = cand.socketFileTransfer;
+			int pfd = cand.senderFdRedDDC;
+			int rfd = cand.receiverFdRedDDC;
 
 			// cerrar recursos
 			cand.closeAll();
 
 			// borrar mappings por seguridad
-			if (lfd != -1) _fdToTransferId.erase(lfd);
-			if (pfd != -1) _fdToTransferId.erase(pfd);
-			if (rfd != -1) _fdToTransferId.erase(rfd);
+			if (lfd != -1) 
+				_fdToTransferId.erase(lfd);
+			if (pfd != -1)
+				_fdToTransferId.erase(pfd);
+			if (rfd != -1)
+				_fdToTransferId.erase(rfd);
 
 			// quitar fds de _fds si estaban presentes
 			size_t kk = 0;
@@ -268,7 +279,8 @@ void Server::cleanupTransfersForClient(int badfd)
 				if (fdk == lfd || fdk == pfd || fdk == rfd)
 				{
 					// cerrar por si acaso
-					if (fdk >= 0) close(fdk);
+					if (fdk >= 0)
+						close(fdk);
 					_fds.erase(_fds.begin() + kk);
 					continue;
 				}
@@ -279,7 +291,12 @@ void Server::cleanupTransfersForClient(int badfd)
 		}
 		++ittr;
 	}
+
 	// borrar transfers recogidos
-	for (size_t x = 0; x < toEraseTids.size(); ++x)
+	size_t x = 0;
+	while (x < toEraseTids.size())
+	{
 		_transfers.erase(toEraseTids[x]);
+		++x;
+	}
 }

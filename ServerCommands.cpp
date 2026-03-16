@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 12:04:25 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/16 15:18:30 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -455,6 +455,8 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 	if (channel.clients.empty())
 		_channels.erase(it);
 }
+
+
 void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 {
 	// Formato: "PRIVMSG <target> :<message>"
@@ -641,10 +643,22 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 					return;
 				}
 
-				// Guardar la transferencia en el mapa del servidor (se hace la copia de metadata,
-				// la instancia almacenada será la que posea los fds reales)
+				// Guardar la transferencia en el mapa del servidor (copiamos metadata).
 				_transfers[ft.id] = ft;
-				int lfd = _transfers[ft.id].listenerFd;
+
+				// transferir ownership del fd al objeto en el mapa
+				_transfers[ft.id].socketFileTransfer = ft.socketFileTransfer;
+				// evitar que el destructor del objeto local cierre el fd (liberar propiedad)
+				ft.socketFileTransfer = -1;
+
+				// ahora sí obtenemos el fd real
+				int lfd = _transfers[ft.id].socketFileTransfer;
+				if (lfd == -1)
+				{
+					// fallback seguro (no debería ocurrir si createListener() tuvo éxito)
+					sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (no listener fd)");
+					return;
+				}
 
 				// Añadir listener al array de poll para que runLoop() lo gestione
 				pollfd pfd; pfd.fd = lfd; pfd.events = POLLIN; pfd.revents = 0;
@@ -654,23 +668,55 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 				_fdToTransferId[lfd] = ft.id;
 
 				// Obtener IP del servidor para enviar al receptor (si no se puede, usar 127.0.0.1)
+				// NOTA: no usar getsockname(_server_fd) cuando _server_fd está ligado a INADDR_ANY,
+				// porque devolvería 0.0.0.0. En su lugar intentamos averiguar la IP saliente
+				// creando un socket UDP y "conectándolo" a una IP pública (no se envía tráfico).
 				std::string serverIp = "127.0.0.1";
-				if (_server_fd != -1)
 				{
-					struct sockaddr_in sin;
-					socklen_t slen = sizeof(sin);
-					if (getsockname(_server_fd, (struct sockaddr *)&sin, &slen) != -1)
+					int sock = socket(AF_INET, SOCK_DGRAM, 0);
+					if (sock != -1)
 					{
-						char ipbuf[INET_ADDRSTRLEN];
-						if (inet_ntop(AF_INET, &sin.sin_addr, ipbuf, sizeof(ipbuf)) != NULL)
-							serverIp = ipbuf;
+						struct sockaddr_in remote;
+						std::memset(&remote, 0, sizeof(remote));
+						remote.sin_family = AF_INET;
+						// conectar a una IP pública solo para conocer la interfaz saliente
+						inet_pton(AF_INET, "8.8.8.8", &remote.sin_addr);
+						remote.sin_port = htons(53);
+						// connect no envía paquetes en UDP, solo deja elegir interfaz
+						if (connect(sock, (struct sockaddr*)&remote, sizeof(remote)) != -1)
+						{
+							struct sockaddr_in name;
+							socklen_t namelen = sizeof(name);
+							if (getsockname(sock, (struct sockaddr*)&name, &namelen) != -1)
+							{
+								char ipbuf[INET_ADDRSTRLEN];
+								if (inet_ntop(AF_INET, &name.sin_addr, ipbuf, sizeof(ipbuf)) != NULL)
+									serverIp = ipbuf;
+							}
+						}
+						close(sock);
 					}
 				}
 
+				// Convertir IP (dotted) a entero decimal que usa DCC (ntohl(inet_addr(ip)))
+				uint32_t ip_net = inet_addr(serverIp.c_str()); // network order
+				uint32_t ip_decimal = ntohl(ip_net);          // host order decimal
+
 				// Construir el CTCP DCC SEND modificado para el receptor (le decimos que se conecte al servidor)
 				unsigned short port = _transfers[ft.id].getListenerPort();
-				std::string dccmsg = "\001DCC SEND " + filename + " " + serverIp + " " + intToString((int)port) + " " + intToString((int)fsize) + "\001";
+				if (port == 0)
+				{
+					// fallback: puerto inválido
+					sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (listener port=0)");
+					return;
+				}
+
+				// Formato clásico DCC: IP en decimal (host order) y puerto en decimal.
+				std::string dccmsg = "\001DCC SEND " + filename + " " + intToString((int)ip_decimal) + " " + intToString((int)port) + " " + intToString((int)fsize) + "\001";
 				std::string outmsg = ":" + prefix + " PRIVMSG " + target + " :" + dccmsg;
+
+				// debug: ver exactamente qué envia el servidor en el CTCP
+				std::cout << "DEBUG: enviando CTCP DCC al fd " << dst_fd << " -> [" << dccmsg << "] (serverIp=" << serverIp << " port=" << port << ")\n";
 
 				// Enviar al receptor el CTCP con IP/puerto del proxy
 				sendNumeric(dst_fd, outmsg);
@@ -693,3 +739,288 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 	std::cout << "PRIVMSG: enviando PRIVMSG de fd " << clientFd << " a fd " << dst_fd << " msg=[" << out << "]\n";
 	sendNumeric(dst_fd, out);
 }
+
+/*
+void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
+{
+	// Formato: "PRIVMSG <target> :<message>"
+	const size_t prefix_len = 8; // strlen("PRIVMSG ")
+	if (line.size() <= prefix_len)
+	{
+		sendNumeric(clientFd, "461 PRIVMSG :Not enough parameters");
+		return;
+	}
+
+	// localizar espacio tras "PRIVMSG "
+	size_t space = line.find(' ', prefix_len);
+	if (space == std::string::npos)
+	{
+		sendNumeric(clientFd, "461 PRIVMSG :Not enough parameters");
+		return;
+	}
+
+	// extraer target (nick o canal)
+	std::string target = line.substr(prefix_len, space - prefix_len);
+
+	// trim target por seguridad (inicio / fin)
+	while (!target.empty() && (target[0] == ' ' || target[0] == '\t'))
+		target.erase(0, 1);
+	while (!target.empty() && (target[target.size() - 1] == ' ' || target[target.size() - 1] == '\t'))
+		target.erase(target.size() - 1, 1);
+
+	// localizar ':' que inicia el texto del mensaje
+	size_t colon = line.find(':', space + 1);
+	std::string text;
+
+	if (colon == std::string::npos)
+	{
+		// No hay texto
+		sendNumeric(clientFd, "412 :No text to send");
+		return;
+	}
+	else
+	{
+		text = line.substr(colon + 1);
+		if (text.empty())
+		{
+			sendNumeric(clientFd, "412 :No text to send");
+			return;
+		}
+	}
+
+	// ===========================================================
+	//   Construcción del prefijo IRC del emisor (nick!user@host)
+	//   ===========================================================
+	std::string nick = _clients[clientFd].nickname;
+	std::string user = _clients[clientFd].username;
+
+	if (nick.empty())
+		nick = intToString(clientFd);
+
+	if (user.empty())
+		user = "user";
+
+	std::string prefix = nick + "!" + user + "@localhost";
+
+	// ===========================================================
+	//   Si target es canal: reenviar como antes (sin DCC)
+	//   ===========================================================
+	if (!target.empty() && (target[0] == '#' || target[0] == '&' || target[0] == '+' || target[0] == '!'))
+	{
+		std::map<std::string, Channel>::iterator channelIterator = _channels.find(target);
+		if (channelIterator == _channels.end())
+		{
+			sendNumeric(clientFd, "403 " + target + " :No such channel");
+			return;
+		}
+
+		Channel &channel = channelIterator->second;
+
+		if (!channel.hasClient(clientFd))
+		{
+			sendNumeric(clientFd, "442 " + target + " :You're not on that channel");
+			return;
+		}
+
+		std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
+
+		std::set<int>::iterator it = channel.clients.begin();
+		while (it != channel.clients.end())
+		{
+			int fd = *it;
+			if (fd == clientFd)
+			{
+				++it;
+				continue;
+			}
+			if (_clients.find(fd) == _clients.end())
+			{
+				++it;
+				continue;
+			}
+			sendNumeric(fd, out);
+			++it;
+		}
+		return;
+	}
+
+	// ===========================================================
+	  // Si target es usuario -> comprobar DCC (CTCP dentro del PRIVMSG)
+	  // Nota: /dcc send del cliente se traduce en un PRIVMSG con CTCP:
+	  //       PRIVMSG nick :\001DCC SEND <file> <ip> <port> <size>\001
+	 //  =========================================================== 
+
+	int dst_fd = getFdByNick(target);
+	if (dst_fd == -1)
+	{
+		sendNumeric(clientFd, "401 " + target + " :No such nick");
+		return;
+	}
+
+	// Si el texto comienza con 0x01 (CTCP) y contiene "DCC SEND " en la posición 1,
+	// lo consideramos una petición DCC SEND que podemos interceptar.
+	if (!text.empty() && text[0] == '\001')
+	{
+		const std::string dccPrefix = "DCC SEND ";
+		size_t pos = text.find(dccPrefix, 1); // buscar a partir de la posición 1 (tras \001)
+		if (pos == 1)
+		{
+			// Extraer la porción después de "DCC SEND "
+			size_t start = pos + dccPrefix.size(); // inicio de los tokens: filename ip port size
+			std::string rest = "";
+			if (start < text.size())
+				rest = text.substr(start);
+
+			// quitar un posible \001 final
+			if (!rest.empty() && rest[rest.size() - 1] == '\001')
+				rest.erase(rest.size() - 1);
+
+			// Tokenizar rest por espacios de forma manual:
+			std::vector<std::string> toks;
+			std::string s = rest;
+			while (!s.empty())
+			{
+				// saltar espacios iniciales
+				while (!s.empty() && (s[0] == ' ' || s[0] == '\t'))
+					s.erase(0, 1);
+				if (s.empty())
+					break;
+				size_t p = s.find(' ');
+				if (p == std::string::npos)
+				{
+					toks.push_back(s);
+					break;
+				}
+				toks.push_back(s.substr(0, p));
+				s.erase(0, p + 1);
+			}
+
+			// Esperamos al menos el filename (toks[0]). ip/port/size son opcionales
+			if (!toks.empty())
+			{
+				std::string filename = toks[0];
+				unsigned long fsize = 0;
+				// si nos dan size (habitualmente en toks[3]) intentamos parsearlo
+				if (toks.size() >= 4)
+				{
+					char *endptr = NULL;
+					fsize = (unsigned long)ftStrtol(toks[3].c_str(), &endptr);
+					if (*endptr != '\0')
+						fsize = 0; // parse error -> 0
+				}
+
+				// Construir la transferencia y crear listener (proxy)
+				FileTransfer ft;
+				ft.id = _nextTransferId++;
+				ft.senderFd = clientFd;
+				ft.receiverFd = dst_fd;
+				ft.filename = filename;
+				ft.filesize = fsize;
+
+				// Intentar crear el listener (ephemeral port)
+				if (ft.createListener() != 0)
+				{
+					// fallo: avisar al emisor y reenviar el PRIVMSG original como fallback
+					sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy failed to create listener");
+					std::string fallback = ":" + prefix + " PRIVMSG " + target + " :" + text;
+					sendNumeric(dst_fd, fallback);
+					return;
+				}
+
+				// Guardar la transferencia en el mapa del servidor (copiamos metadata).
+				_transfers[ft.id] = ft;
+
+				// transferir ownership del fd al objeto en el mapa
+				_transfers[ft.id].socketFileTransfer = ft.socketFileTransfer;
+				// evitar que el destructor del objeto local cierre el fd (liberar propiedad)
+				ft.socketFileTransfer = -1;
+
+				// ahora sí obtenemos el fd real
+				int lfd = _transfers[ft.id].socketFileTransfer;
+				if (lfd == -1)
+				{
+					// fallback seguro (no debería ocurrir si createListener() tuvo éxito)
+					sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (no listener fd)");
+					return;
+				}
+
+				// Añadir listener al array de poll para que runLoop() lo gestione
+				pollfd pfd; pfd.fd = lfd; pfd.events = POLLIN; pfd.revents = 0;
+				_fds.push_back(pfd);
+
+				// Mapear el fd del listener a la transferencia
+				_fdToTransferId[lfd] = ft.id;
+
+				// Obtener IP del servidor para enviar al receptor (si no se puede, usar 127.0.0.1)
+				// NOTA: no usar getsockname(_server_fd) cuando _server_fd está ligado a INADDR_ANY,
+				// porque devolvería 0.0.0.0. En su lugar intentamos averiguar la IP saliente
+				// creando un socket UDP y "conectándolo" a una IP pública (no se envía tráfico).
+				std::string serverIp = "127.0.0.1";
+				{
+					int sock = socket(AF_INET, SOCK_DGRAM, 0);
+					if (sock != -1)
+					{
+						struct sockaddr_in remote;
+						std::memset(&remote, 0, sizeof(remote));
+						remote.sin_family = AF_INET;
+						// conectar a una IP pública solo para conocer la interfaz saliente
+						inet_pton(AF_INET, "8.8.8.8", &remote.sin_addr);
+						remote.sin_port = htons(53);
+						// connect no envía paquetes en UDP, solo deja elegir interfaz
+						if (connect(sock, (struct sockaddr*)&remote, sizeof(remote)) != -1)
+						{
+							struct sockaddr_in name;
+							socklen_t namelen = sizeof(name);
+							if (getsockname(sock, (struct sockaddr*)&name, &namelen) != -1)
+							{
+								char ipbuf[INET_ADDRSTRLEN];
+								if (inet_ntop(AF_INET, &name.sin_addr, ipbuf, sizeof(ipbuf)) != NULL)
+									serverIp = ipbuf;
+							}
+						}
+						close(sock);
+					}
+				}
+
+				// Convertir IP (dotted) a entero decimal que usa DCC (ntohl(inet_addr(ip)))
+				uint32_t ip_net = inet_addr(serverIp.c_str()); // network order
+				uint32_t ip_decimal = ntohl(ip_net);          // host order decimal
+
+				// Construir el CTCP DCC SEND modificado para el receptor (le decimos que se conecte al servidor)
+				unsigned short port = _transfers[ft.id].getListenerPort();
+				if (port == 0)
+				{
+					// fallback: puerto inválido
+					sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (listener port=0)");
+					return;
+				}
+
+				// Formato clásico DCC: IP en decimal (host order) y puerto en decimal.
+				std::string dccmsg = "\001DCC SEND " + filename + " " + intToString((int)ip_decimal) + " " + intToString((int)port) + " " + intToString((int)fsize) + "\001";
+				std::string outmsg = ":" + prefix + " PRIVMSG " + target + " :" + dccmsg;
+
+				// debug: ver exactamente qué envia el servidor en el CTCP
+				std::cout << "DEBUG: enviando CTCP DCC al fd " << dst_fd << " -> [" << dccmsg << "] (serverIp=" << serverIp << " port=" << port << ")\n";
+
+				// Enviar al receptor el CTCP con IP/puerto del proxy
+				sendNumeric(dst_fd, outmsg);
+
+				// Informar al emisor (opcional, mensaje NOTICE)
+				std::string senderNick = _clients[clientFd].nickname;
+				if (senderNick.empty())
+					senderNick = intToString(clientFd);
+				sendNumeric(clientFd, ":ircserv NOTICE " + senderNick + " :DCC proxy created id=" + intToString((int)ft.id));
+
+				// Fin: no reenviamos el PRIVMSG original (interceptado)
+				return;
+			}
+		}
+	}
+
+	// Si no era un DCC SEND o el parse falló -> reenviar PRIVMSG clásico al destinatario
+	std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
+
+	std::cout << "PRIVMSG: enviando PRIVMSG de fd " << clientFd << " a fd " << dst_fd << " msg=[" << out << "]\n";
+	sendNumeric(dst_fd, out);
+}
+ */

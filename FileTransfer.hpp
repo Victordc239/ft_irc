@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   FileTransfer.hpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:24 by victor            #+#    #+#             */
-/*   Updated: 2026/03/16 12:03:13 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/16 14:47:06 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,15 +23,17 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 
+/*al enviar un archivo creamos una nueva red que se llama DDC, entonces en ese mommento tenemos dos redes, una la IRC y otra que es DDC*/
+
 class FileTransfer
 {
 	public:
-		unsigned long id;       // id único (Server asigna)
-		int senderFd;           // fd del emisor (cliente que solicitó enviar)
-		int receiverFd;         // fd del receptor (cliente objetivo)
-		int listenerFd;         // socket listening creado por el server (-1 si no)
-		int peerFd;             // primer accept() (-1 si no)
-		int remoteFd;           // segundo socket de la transferencia (-1 si no)
+		unsigned long id;		// id único (Server asigna)
+		int senderFd;		// fd del emisor (cliente que solicitó enviar)
+		int receiverFd;		// fd del receptor (cliente objetivo)
+		int socketFileTransfer;	// socket listening creado por el server (-1 si no)
+		int senderFdRedDDC;	// fd del cliente que envia cuando se conecta a la red DDC para la transferencia de archivos
+		int receiverFdRedDDC;		// fd del cliente que recibe cuando se conecta a la red DDC para la transferencia de archivos
 		std::string filename;
 		unsigned long filesize;
 		unsigned long bytesTransferred;
