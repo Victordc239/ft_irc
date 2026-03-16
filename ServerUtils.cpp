@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 16:21:40 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 16:29:40 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 17:12:12 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -84,4 +84,23 @@ long ftStrtol(const char *str, char **endptr)
 	}
 
 	return (result * sign);
+}
+
+bool	parseDccIpToken(const std::string &tok, struct in_addr &out)
+{
+	// Caso 1: IP decimal estilo DCC (ej: 2130706433)
+	char *endptr = NULL;
+	unsigned long ip_dec = strtoul(tok.c_str(), &endptr, 10);
+	if (!tok.empty() && *endptr == '\0')
+	{
+		out.s_addr = htonl((uint32_t)ip_dec);
+		return (true);
+	}
+
+	// Caso 2: IP normal con puntos (ej: 127.0.0.1)
+	out.s_addr = inet_addr(tok.c_str());
+	if (out.s_addr == INADDR_NONE && tok != "255.255.255.255")
+		return (false);
+
+	return (true);
 }

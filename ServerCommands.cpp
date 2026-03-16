@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 17:02:06 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/16 17:13:23 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -693,25 +693,11 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 					sender_addr.sin_family = AF_INET;
 					bool haveSenderAddr = false;
 
-					// 1) ¿es un número decimal (ej: 2130706433) ?
-					char *endptr_ip = NULL;
-					unsigned long ip_dec = strtoul(orig_ip_tok.c_str(), &endptr_ip, 10);
-					if (!orig_ip_tok.empty() && *endptr_ip == '\0')
+					struct in_addr ina;
+					if (parseDccIpToken(orig_ip_tok, ina))
 					{
-						// ip_dec está en host order decimal, convertir a network order
-						uint32_t ip_net = htonl((uint32_t)ip_dec);
-						sender_addr.sin_addr.s_addr = ip_net;
+						sender_addr.sin_addr = ina;
 						haveSenderAddr = true;
-					}
-					else
-					{
-						// 2) probar dotted quad
-						struct in_addr ina;
-						if (inet_pton(AF_INET, orig_ip_tok.c_str(), &ina) == 1)
-						{
-							sender_addr.sin_addr = ina;
-							haveSenderAddr = true;
-						}
 					}
 
 					int sender_port = 0;
@@ -802,7 +788,7 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 						std::memset(&remote, 0, sizeof(remote));
 						remote.sin_family = AF_INET;
 						// conectar a una IP pública solo para conocer la interfaz saliente
-						inet_pton(AF_INET, "8.8.8.8", &remote.sin_addr);
+						remote.sin_addr.s_addr = inet_addr("8.8.8.8");
 						remote.sin_port = htons(53);
 						// connect no envía paquetes en UDP, solo deja elegir interfaz
 						if (connect(sock, (struct sockaddr*)&remote, sizeof(remote)) != -1)
