@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 22:44:00 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/17 14:21:09 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -748,9 +748,20 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 
 	if (colon == std::string::npos)
 	{
-		// No hay texto
-		sendNumeric(clientFd, "412 :No text to send");
-		return;
+		// No hay ':', pero puede que el cliente haya enviado el mensaje sin el prefijo ':'
+		// Ej: "PRIVMSG nick hello there" -> tomar el resto tras el target como texto.
+		text = line.substr(space + 1);
+		// trim simple de inicio/fin
+		while (!text.empty() && (text[0] == ' ' || text[0] == '\t'))
+			text.erase(0, 1);
+		while (!text.empty() && (text[text.size() - 1] == '\r' || text[text.size() - 1] == '\n'))
+			text.erase(text.size() - 1, 1);
+
+		if (text.empty())
+		{
+			sendNumeric(clientFd, "412 :No text to send");
+			return;
+		}
 	}
 	else
 	{
@@ -760,6 +771,9 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 			sendNumeric(clientFd, "412 :No text to send");
 			return;
 		}
+		// quitar posible CR al final
+		if (!text.empty() && text[text.size() - 1] == '\r')
+			text.erase(text.size() - 1);
 	}
 
 	/* ===========================================================
