@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/17 10:40:02 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/17 17:04:44 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,7 +39,7 @@ int Server::getFdByNick(const std::string &nick) const
 }
 
 // helper para enviar mensajes numéricos o líneas
-void Server::sendNumeric(int fd, const std::string &msg)
+/* void Server::sendNumeric(int fd, const std::string &msg)
 {
 	// Si no conocemos el cliente, ignorar
 	if (_clients.find(fd) == _clients.end())
@@ -106,6 +106,82 @@ void Server::sendNumeric(int fd, const std::string &msg)
 	else
 	{
 		// Si todo fue enviado, quitar POLLOUT si existe.
+		size_t j = 0;
+		while (j < _fds.size())
+		{
+			if (_fds[j].fd == fd)
+			{
+				_fds[j].events &= ~POLLOUT;
+				break;
+			}
+			++j;
+		}
+	}
+} */
+
+void Server::sendNumeric(int fd, const std::string &msg)
+{
+	// Si no conocemos el cliente, ignorar
+	if (_clients.find(fd) == _clients.end())
+		return;
+
+	// Construir la línea completa con CRLF y encolar
+	std::string full = msg + "\r\n";
+	std::string &out = _clients[fd].outbuf;
+
+	// --- Protección: no permitir crecimiento infinito del buffer ---
+	// Si el nuevo tamaño supera 1048576, desconectamos el cliente para
+	// evitar OOM y comportamiento indefinido bajo flood.
+	if (out.size() + full.size() > 1048576)
+	{
+		std::cerr << "WARNING: client fd " << fd << " exceeded 1MB (" << (out.size() + full.size()) << " bytes). Disconnecting.\n";
+
+		// Limpiar transferencias que referencien a este cliente (si aplica)
+		cleanupTransfersForClient(fd);
+
+		// Cerrar y eliminar cliente de estructuras
+		close(fd);
+		_clients.erase(fd);
+		_fdToTransferId.erase(fd);
+
+		// Quitar fd de la lista de poll
+		removePollFd(_fds, fd);
+
+		return;
+	}
+
+	// Encolar el mensaje (NO intentar send() aquí)
+	out += full;
+
+	// Si aún queda algo por enviar, asegurarnos de monitorizar POLLOUT.
+	if (!out.empty())
+	{
+		bool found = false;
+		size_t j = 0;
+		while (j < _fds.size())
+		{
+			if (_fds[j].fd == fd)
+			{
+				_fds[j].events |= POLLOUT;
+				found = true;
+				break;
+			}
+			++j;
+		}
+
+		// Si no existe entrada en _fds para este fd (posible causa del bug), crearla.
+		if (!found)
+		{
+			pollfd p;
+			p.fd = fd;
+			p.events = POLLIN | POLLOUT; // queremos leer y escribir
+			p.revents = 0;
+			_fds.push_back(p);
+		}
+	}
+	else
+	{
+		// Si todo fue enviado (caso raro porque acabamos de encolar), quitar POLLOUT si existe.
 		size_t j = 0;
 		while (j < _fds.size())
 		{
