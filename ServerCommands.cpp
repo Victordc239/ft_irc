@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/17 14:21:09 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/17 14:47:32 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -798,6 +798,22 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 
 	if (!isCTCP)
 		botReply = _bot.generateReply(text, nick); // pasamos el texto tal cual al bot; el bot rellenará kickTarget si corresponde
+
+	/* ===========================================================
+		SI EL MENSAJE ES DIRECTAMENTE AL BOT (PRIVADO)
+		=========================================================== */
+	if (target == _bot.getName())
+	{
+		if (!botReply.empty() && !isCTCP)
+		{
+			std::string botOut =
+				":" + _bot.getName() + "!bot@localhost PRIVMSG " +
+				nick + " :" + botReply;
+
+			sendNumeric(clientFd, botOut);
+		}
+		return;
+	}
 
 	/* ===========================================================
 		Si target es canal: reenviar como antes (sin DCC)
