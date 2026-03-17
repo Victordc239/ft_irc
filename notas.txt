@@ -7,5 +7,3 @@
 - Comprobar que la funciones tienen máximo 100 líneas, sino modificar y dividir
 - Cambiar el nombre de las funciones, las variables y los archivos (nombres descriptivos)
 - Comprobar hoja de correcciones : https://www.42evalhub.com/common/ftirc
-
-- comprobar porque al hacer /msg en un cliente porque el cliennte destino no recibe el mensaje?

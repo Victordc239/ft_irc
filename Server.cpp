@@ -6,7 +6,7 @@
 /*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 22:11:04 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/17 10:40:02 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -81,14 +81,16 @@ void Server::sendNumeric(int fd, const std::string &msg)
 	if (!out.empty())
 	{
 		bool found = false;
-		for (size_t j = 0; j < _fds.size(); ++j)
+		size_t j = 0;
+		while (j < _fds.size())
 		{
 			if (_fds[j].fd == fd)
 			{
-			_fds[j].events |= POLLOUT;
-			found = true;
-			break;
+				_fds[j].events |= POLLOUT;
+				found = true;
+				break;
 			}
+			++j;
 		}
 
 		// Si no existe entrada en _fds para este fd (posible causa del bug), crearla.
@@ -104,13 +106,15 @@ void Server::sendNumeric(int fd, const std::string &msg)
 	else
 	{
 		// Si todo fue enviado, quitar POLLOUT si existe.
-		for (size_t j = 0; j < _fds.size(); ++j)
+		size_t j = 0;
+		while (j < _fds.size())
 		{
 			if (_fds[j].fd == fd)
 			{
 				_fds[j].events &= ~POLLOUT;
 				break;
 			}
+			++j;
 		}
 	}
 }

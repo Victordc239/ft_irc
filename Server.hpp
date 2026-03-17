@@ -6,7 +6,7 @@
 /*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 23:03:22 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/17 11:05:49 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -88,8 +88,8 @@ class Server
 };
 
 std::string	intToString(int n);
-long	ftStrtol(const char *str, char **endptr);
-bool	parseDccIpToken(const std::string &tok, struct in_addr &out);
+long		ftStrtol(const char *str, char **endptr);
+bool		parseDccIpToken(const std::string &tok, struct in_addr &out);
 
 
 #endif

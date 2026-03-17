@@ -6,7 +6,7 @@
 /*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 14:47:22 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 22:44:09 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/17 10:31:17 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -235,9 +235,12 @@ void Server::mode_user(int clientFd, const std::string &target, const std::strin
 
 	bool plus = true;
 	std::string applied; // para construir el eco final (ej "+i" o "-i")
-	for (size_t i = 0; i < modes.size(); ++i)
+	size_t i = 0;
+	while (i < modes.size())
 	{
 		char c = modes[i];
+		i++;
+
 		if (c == '+')
 		{
 			plus = true;
