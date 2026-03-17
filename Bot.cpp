@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Bot.cpp                                            :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 15:06:23 by sofernan          #+#    #+#             */
-/*   Updated: 2026/03/16 22:23:08 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/17 14:43:35 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,7 +44,7 @@ const std::string &Bot::getName() const
 std::string Bot::generateReply(const std::string &cmd, const std::string &nick)
 {
 	if (cmd == "!hello")
-		return ("Hello" + nick + "👋");
+		return ("Hello " + nick + "  👋");
 
 	if (cmd == "!help")
 		return ("Commands: !hello !time");
