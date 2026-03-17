@@ -1,6 +1,5 @@
 - Comprobar errores
 - Comprobar el uso de la función fcntl (posible solución: perderiamos las flags del socket)
-- Hacer el bot del bonus
 - Hacer el README.md
 - Comprobar el manejo de pasar el comando en partes con Ctrl+D y nc -C
 - Comprobar el uso de funciones prohibidas
