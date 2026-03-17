@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   FileTransfer.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: alejaro2 <alejaro2@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/16 22:36:59 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/17 17:09:14 by alejaro2         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -92,10 +92,14 @@ FileTransfer::~FileTransfer()
 
 int FileTransfer::setNonBlocking(int fd)
 {
-	int flags = fcntl(fd, F_GETFL, 0);
-	if (flags == -1)
-		return (-1);
-	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+	// int flags = fcntl(fd, F_GETFL, 0);
+	// if (flags == -1)
+	// 	return (-1);
+	// if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+	// 	return (-1);
+	// return (0);
+
+	if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
 		return (-1);
 	return (0);
 }

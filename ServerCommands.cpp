@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: alejaro2 <alejaro2@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/17 14:47:32 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/17 17:15:44 by alejaro2         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -606,9 +606,10 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 				if (s != -1)
 				{
 					// poner non-blocking
-					int fl = fcntl(s, F_GETFL, 0);
-					if (fl != -1)
-						fcntl(s, F_SETFL, fl | O_NONBLOCK);
+					// int fl = fcntl(s, F_GETFL, 0);
+					// if (fl != -1)
+					// 	fcntl(s, F_SETFL, fl | O_NONBLOCK);
+					fcntl(s, F_SETFL, O_NONBLOCK);
 
 					int cres = connect(s, (struct sockaddr*)&sender_addr, sizeof(sender_addr));
 					if (cres == 0)
