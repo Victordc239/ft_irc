@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: alejaro2 <alejaro2@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/17 17:37:02 by alejaro2         ###   ########.fr       */
+/*   Updated: 2026/03/18 11:20:31 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,7 +40,7 @@ int Server::getFdByNick(const std::string &nick) const
 
 
 // helper para enviar mensajes numéricos o líneas
-/* void Server::sendNumeric(int fd, const std::string &msg)
+void Server::sendNumeric(int fd, const std::string &msg)
 {
 	// Si no conocemos el cliente, ignorar
 	if (_clients.find(fd) == _clients.end())
@@ -118,9 +118,9 @@ int Server::getFdByNick(const std::string &nick) const
 			++j;
 		}
 	}
-} */
+}
 
-void Server::sendNumeric(int fd, const std::string &msg)
+/* void Server::sendNumeric(int fd, const std::string &msg)
 {
 	// Si no conocemos el cliente, ignorar
 	if (_clients.find(fd) == _clients.end())
@@ -194,8 +194,7 @@ void Server::sendNumeric(int fd, const std::string &msg)
 			++j;
 		}
 	}
-}
-
+} */
 
 Server::Server()
 {

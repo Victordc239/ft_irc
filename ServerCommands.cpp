@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: alejaro2 <alejaro2@student.42.fr>          +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/17 17:15:44 by alejaro2         ###   ########.fr       */
+/*   Updated: 2026/03/18 11:24:29 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -174,7 +174,6 @@ void Server::handleUserCommand(int clientFd, const std::string &line)
 		sendNumeric(clientFd, "461 USER :Not enough parameters");
 	}
 }
-
 void Server::handleJoinCommand(int clientFd, const std::string &line)
 {
 	// Formato esperado: "JOIN <#channel> [key]"
@@ -315,6 +314,31 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		}
 		sendNumeric(fd, joinmsg);
 		++iteratorMessageJoin;
+	}
+
+	/* Enviar estado de modos del canal (RPL_CHANNELMODEIS 324)
+	   Enviar explícitamente el modo actual ayuda a clientes como irssi a
+	   considerar el JOIN "sincronizado" inmediatamente. */
+	std::string modes = "";
+	std::string params = "";
+	if (channel.isInviteOnly())
+		modes += "i";
+	if (channel.isTopicRestricted())
+		modes += "t";
+	if (channel.hasKey())
+	{
+		modes += "k";
+		params += " " + channel.getKey();
+	}
+	if (channel.getLimit() > 0)
+	{
+		modes += "l";
+		params += " " + intToString(channel.getLimit());
+	}
+	if (!modes.empty())
+	{
+		std::string reply = ":ircserv 324 " + nick + " " + nameChannel + " +" + modes + params;
+		sendNumeric(clientFd, reply);
 	}
 
 	/* Enviar lista de usuarios del canal al cliente que entra (NAMES) */

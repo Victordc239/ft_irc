@@ -6,7 +6,7 @@
 /*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/09 14:39:18 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/13 10:55:13 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/18 12:00:45 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -492,15 +492,8 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 
 	// ------------------------------
 	// A partir de aquí -> se intenta CAMBIAR modos (rest NO está vacío)
-	// Por seguridad/consistencia: solo operadores pueden cambiar modos.
-	// ------------------------------
-	if (!channel.isOperator(clientFd))
-	{
-		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
-		return;
-	}
-
 	// Tokenizar rest *manualmente* (sin usar split) — tokens separados por espacios
+	// ------------------------------
 	std::vector<std::string> tokens;
 	std::string s = rest;
 	while (!s.empty())
@@ -533,6 +526,50 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 	size_t paramIndex = 1;
 	bool plus = true;
 
+	/*excepcion de ignorar el mode #test b*/
+	bool onlyB = true;
+	bool hasPlusSign = false;
+	size_t k = 0;
+	while (k < modeToken.size())
+	{
+		if (modeToken[k] == '+')
+		{
+			hasPlusSign = true;
+			++k;
+			continue;
+		}
+		if (modeToken[k] == '-')
+		{
+			++k;
+			continue;
+		}
+		// si aparece cualquier flag distinta de 'b' -> no es solo 'b'
+		if (modeToken[k] != 'b')
+		{
+			onlyB = false;
+			break;
+		}
+		++k;
+	}
+
+	// Por seguridad/consistencia: solo operadores pueden cambiar modos.
+	// EXCEPCIÓN: si es únicamente "+b" (o combinación de +/- y solo 'b') y el usuario
+	// NO es operador, ignoramos silenciosamente en lugar de enviar 482.
+	if (!channel.isOperator(clientFd))
+	{
+		if (onlyB && hasPlusSign)
+		{
+			// ignorar silenciosamente +b de no-operadores (no enviamos 482)
+			return;
+		}
+		// cualquier otro intento de cambiar modos requiere operador
+		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
+		return;
+	}
+
+	// ------------------------------
+	// A partir de aquí el emisor SÍ es operador -> aplicar cambios
+	// ------------------------------
 	size_t i = 0;
 	while (i < modeToken.size())
 	{
