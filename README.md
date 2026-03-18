@@ -20,13 +20,13 @@ Additionally, the bonus part of the project has been implemented to extend the s
 - Implementation of a bot to automate interactions and responses. 
 
 ## Architecture Overview
-   +----------------+        TCP        +----------------+
-   |  IRC Client 1  | <--------------> |                |
-   +----------------+                   |                |
-   |  IRC Client 2  | <--------------> |   IRC Server   |
-   +----------------+                   |                |
-   |  IRC Client 3  | <--------------> |                |
-   +----------------+                   +----------------+
++----------------+        TCP        +----------------+
+|  IRC Client 1  | <--------------> |                |
++----------------+                   |                |
+|  IRC Client 2  | <--------------> |   IRC Server   |
++----------------+                   |                |
+|  IRC Client 3  | <--------------> |                |
++----------------+                   +----------------+
 
 - Server listens on a specified port and manages all client connections.  
 - Each client connects via TCP sockets and can send commands/messages.  
@@ -43,11 +43,11 @@ Additionally, the bonus part of the project has been implemented to extend the s
 
 ## Our IRC Commands
 - `NICK`: NICK command is used to give user a nickname or change the existing one.
-- `USER`: he USER command is used at the beginning of connection to specify the username, hostname and realname of a new user.
+- `USER`: The USER command is used at the beginning of connection to specify the username, hostname and realname of a new user.
 - `JOIN`: The JOIN command is used by a user to request to start listening to the specific channel.
 - `PRIVMSG`: PRIVMSG is used to send private messages between users, as well as to send messages to channels.
 - `KICK`: The KICK command can be used to request the forced removal of a user from a channel.
-- `INVITE`
+- `INVITE`:
 - `TOPIC`: The TOPIC command is used to change or view the topic of a channel.
 - `MODE`: The user MODE's are typically changes which affect either how the client is seen by others or what 'extra' messages the client is sent.
 - `PART`: The PART command causes the user sending the message to be removed from the list of active members for all given channels listed in the parameter string.
@@ -69,19 +69,18 @@ Additionally, the bonus part of the project has been implemented to extend the s
 
 ### Clone the Repository
 First, clone the project repository and navigate into it:
-```bash
-git clone <repository_url>
+`git clone <repository_url>`
 
 ### Compilation
 To compile the program, use:
 
 make To start the Server, use:
-./ircserv <port> <password>
-port: The port number on which your IRC server will be listening to for incoming IRC connections.
-password: The connection password. It will be needed by any IRC client that tries to connect to your server. To connect to the server, you can use:
-nc <IP ADDRESS> <PORT>
-IP ADDRESS: Host IP address.
-PORT: The PORT that the server listening on.
+`./ircserv <port> <password>`
+-  port: The port number on which your IRC server will be listening to for incoming IRC connections.
+-  password: The connection password. It will be needed by any IRC client that tries to connect to your server. To connect to the server, you can use:
+`nc <IP ADDRESS> <PORT>`
+-  IP ADDRESS: Host IP address.
+-  PORT: The PORT that the server listening on.
 You can also use the Irssi IRC client.
 
 ## Resources
