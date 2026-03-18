@@ -6,7 +6,7 @@
 /*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 14:14:47 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 23:03:46 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/18 10:59:10 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -172,15 +172,31 @@ bool Server::handleFileTransferEvent(size_t &i)
 		// 2) Completado de conexión no bloqueante del sender
 		if (curFd == ft.senderFdRedDDC && (_fds[i].revents & POLLOUT))
 		{
-			int err = 0;
-			socklen_t errlen = sizeof(err);
-			if (getsockopt(curFd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1 || err != 0)
+			int detectErr = 0;
+			char peekbuf;
+			ssize_t pr = recv(curFd, &peekbuf, 1, MSG_PEEK | MSG_DONTWAIT);
+
+			if (pr == -1)
 			{
-				std::cerr << "ERROR: ft id=" << ft.id << " sender connect failed on fd=" << curFd << " errno=" << err << " (" << strerror(err) << ")\n";
+				if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+				{
+					detectErr = errno;
+				}
+			}
+			else if (pr == 0)
+			{
+				// peer cerró inmediatamente -> fallo de conexión
+				detectErr = ECONNRESET;
+			}
+
+			if (detectErr != 0)
+			{
+				std::cerr << "ERROR: ft id=" << ft.id << " sender connect failed on fd=" << curFd << " errno=" << detectErr << " (" << strerror(detectErr) << ")\n";
 				ft.closeAll();
 				++i;
 				return (true);
 			}
+			// ---------------------------------------------------------------
 
 			// Ya quedó conectado: dejamos de vigilar POLLOUT y pasamos a POLLIN
 			setPollEvents(_fds, curFd, POLLIN);
