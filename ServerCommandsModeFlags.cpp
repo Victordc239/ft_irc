@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommandsModeFlags.cpp                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 14:47:22 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/17 10:31:17 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/18 14:18:58 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -257,9 +257,9 @@ void Server::mode_user(int clientFd, const std::string &target, const std::strin
 			_clients[clientFd].invisible = plus;
 
 			if (plus)
-				std::cout << "fd " << clientFd << "Usuario " << myNick << " ahora es invisible\n";
+				std::cout << "fd " << clientFd << " Usuario " << myNick << " ahora es invisible\n";
 			else
-				std::cout << "fd " << clientFd << "Usuario " << myNick << " ya no es invisible\n";
+				std::cout << "fd " << clientFd << " Usuario " << myNick << " ya no es invisible\n";
 
 			// añadir a applied; simplificamos: concatenamos +i/-i según corresponda
 			if (plus)

@@ -3,6 +3,6 @@
 - Hacer el README.md
 - Comprobar el manejo de pasar el comando en partes con Ctrl+D y nc -C
 - Comprobar el uso de funciones prohibidas
-- Comprobar que la funciones tienen máximo 100 líneas, sino modificar y dividir
+- Comprobar que la funciones tienen máximo 100 líneas, sino modificar y dividir: queda runLoop y handleDccSendInPrivmsg
 - Cambiar el nombre de las funciones, las variables y los archivos (nombres descriptivos)
 - Comprobar hoja de correcciones : https://www.42evalhub.com/common/ftirc

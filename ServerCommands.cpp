@@ -3,22 +3,18 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/18 11:24:29 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/18 17:30:26 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-/* ===========================================================
-   FASE INICIAL DE AUTENTICACIÓN
-   Ahora NO cerramos conexión si el orden es incorrecto.
-   Permitimos PASS en cualquier momento antes del registro.
-   Si es incorrecto enviamos 464 pero NO cerramos.
-   CAP se ignora.
-   =========================================================== */
+//    FASE INICIAL DE AUTENTICACIÓN
+//    Ahora NO cerramos conexión si el orden es incorrecto. Permitimos PASS en cualquier momento antes del registro.
+//    Si es incorrecto enviamos 464 pero NO cerramos. CAP se ignora.
 bool Server::handleInitialAuthentication(size_t &i, const std::string &line)
 {
 	int clientFd = _fds[i].fd;
@@ -80,7 +76,7 @@ bool Server::handleInitialAuthentication(size_t &i, const std::string &line)
 			std::cout << "fd " << clientFd << " CAP " << subcmd << " recibido (ignorando)\n";
 		}
 	}
-	return false;
+	return (false);
 }
 
 void Server::handleNickCommand(int clientFd, const std::string &line)
@@ -119,9 +115,9 @@ void Server::handleNickCommand(int clientFd, const std::string &line)
 
 	if (nickInUse(newnick))
 	{
-		/* ERR_NICKNAMEINUSE 433
-		   Formato recomendado: :<servername> 433 <yournick-or-*> <attemptednick> :Nickname is already in use
-		   Usamos "ircserv" como servername por ahora. */
+		// ERR_NICKNAMEINUSE 433
+		//    Formato recomendado: :<servername> 433 <yournick-or-*> <attemptednick> :Nickname is already in use
+		//    Usamos "ircserv" como servername por ahora.
 		std::string current = _clients[clientFd].nickname;
 		if (current.empty())
 			current = "*";
@@ -169,11 +165,9 @@ void Server::handleUserCommand(int clientFd, const std::string &line)
 		std::cout << "fd " << clientFd << " set USER=" << user << " REAL=" << realname << "\n";
 	}
 	else
-	{
-		// ERR_NEEDMOREPARAMS 461 (usar sendNumeric en vez de send directo)
-		sendNumeric(clientFd, "461 USER :Not enough parameters");
-	}
+		sendNumeric(clientFd, "461 USER :Not enough parameters"); 	// ERR_NEEDMOREPARAMS 461 (usar sendNumeric en vez de send directo)
 }
+
 void Server::handleJoinCommand(int clientFd, const std::string &line)
 {
 	// Formato esperado: "JOIN <#channel> [key]"
@@ -186,6 +180,8 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		rest.erase(0, 1);
 	while (!rest.empty() && (rest[rest.size() - 1] == ' ' || rest[rest.size() - 1] == '\t'))
 		rest.erase(rest.size() - 1, 1);
+
+	// Si no hay parámetros, devolvemos error estándar
 	if (rest.empty())
 	{
 		sendNumeric(clientFd, "461 JOIN :Not enough parameters");
@@ -197,11 +193,14 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 	std::string joinKey;
 	size_t space = rest.find(' ');
 	if (space == std::string::npos)
+	{
 		nameChannel = rest;
+	}
 	else
 	{
 		nameChannel = rest.substr(0, space);
 		joinKey = rest.substr(space + 1);
+
 		// trim joinKey
 		while (!joinKey.empty() && (joinKey[0] == ' ' || joinKey[0] == '\t'))
 			joinKey.erase(0, 1);
@@ -215,13 +214,14 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 	if (!joinKey.empty() && joinKey[joinKey.size() - 1] == '\r')
 		joinKey.erase(joinKey.size() - 1, 1);
 
+	// Validación mínima: nombre de canal no vacío
 	if (nameChannel.empty())
 	{
 		sendNumeric(clientFd, "461 JOIN :Not enough parameters");
 		return;
 	}
 
-	/* VALIDACIÓN DEL NOMBRE DEL CANAL */
+	// VALIDACIÓN DEL NOMBRE DEL CANAL: prefijo válido (# & + !)
 	if (nameChannel[0] != '#' && nameChannel[0] != '&' && nameChannel[0] != '+' && nameChannel[0] != '!')
 	{
 		sendNumeric(clientFd, "403 " + nameChannel + " :Invalid channel prefix");
@@ -250,7 +250,8 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 	{
 		// ERR_INVITEONLYCHAN 473
 		std::string nick = _clients[clientFd].nickname;
-		if (nick.empty()) nick = intToString(clientFd);
+		if (nick.empty())
+			nick = intToString(clientFd);
 		sendNumeric(clientFd, "473 " + nick + " " + nameChannel + " :Cannot join channel (+i)");
 		return;
 	}
@@ -262,7 +263,8 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		if (joinKey.empty() || joinKey != channel.getKey())
 		{
 			std::string nick = _clients[clientFd].nickname;
-			if (nick.empty()) nick = intToString(clientFd);
+			if (nick.empty())
+				nick = intToString(clientFd);
 			sendNumeric(clientFd, "475 " + nick + " " + nameChannel + " :Cannot join channel (+k)");
 			return;
 		}
@@ -272,22 +274,31 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 	if (channel.getLimit() > 0 && (int)channel.clients.size() >= channel.getLimit())
 	{
 		std::string nick = _clients[clientFd].nickname;
-		if (nick.empty()) nick = intToString(clientFd);
+		if (nick.empty())
+			nick = intToString(clientFd);
 		sendNumeric(clientFd, "471 " + nick + " " + nameChannel + " :Cannot join channel (+l)");
 		return;
 	}
 
-	// Todo OK -> unir al canal
+	// Todo OK -> unir al canal (modifica la estructura Channel)
 	channel.addClient(clientFd);
 
 	// Si venía por invitación, consumirla (la invitación se gasta)
 	if (channel.isInvited(clientFd))
 		channel.removeInvite(clientFd);
 
-	/* ===========================================================
-	   Construcción del prefijo IRC correcto (nick!user@localhost)
-	   =========================================================== */
+	// A partir de aquí nos limitamos a delegar la construcción y envío de replies/broadcast
+	// a la función auxiliar, para mantener esta función centrada en parsing/validación.
+	// La función auxiliar asumirá que clientFd ya ha sido añadido a channel.clients.
+	sendJoinReplies(clientFd, nameChannel);
+}
 
+void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
+{
+	// Asumimos que nameChannel existe en _channels y que clientFd ya está en channel.clients
+	Channel &channel = _channels[nameChannel];
+
+	// Construcción del prefijo IRC correcto (nick!user@localhost)
 	std::string nick = _clients[clientFd].nickname;
 	std::string user = _clients[clientFd].username;
 
@@ -299,26 +310,29 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 
 	std::string prefix = nick + "!" + user + "@localhost";
 
-	// mensaje JOIN que verán todos los clientes del canal
+	// mensaje JOIN que verán todos los clientes del canal (broadcast)
+	// Este broadcast incluye al propio cliente que acaba de unirse (como espera IRC).
 	std::string joinmsg = ":" + prefix + " JOIN " + nameChannel;
 
-	// Notificar a todos los miembros (incluido el que entra)
+	// Recorremos la lista de clientes del canal y enviamos el JOIN a cada uno
 	std::set<int>::iterator iteratorMessageJoin = channel.clients.begin();
 	while (iteratorMessageJoin != channel.clients.end())
 	{
 		int fd = *iteratorMessageJoin;
+
+		// Si por algún motivo el fd no existe en nuestra tabla de clientes, lo saltamos.
 		if (_clients.find(fd) == _clients.end())
 		{
 			++iteratorMessageJoin;
 			continue;
 		}
+
 		sendNumeric(fd, joinmsg);
 		++iteratorMessageJoin;
 	}
 
-	/* Enviar estado de modos del canal (RPL_CHANNELMODEIS 324)
-	   Enviar explícitamente el modo actual ayuda a clientes como irssi a
-	   considerar el JOIN "sincronizado" inmediatamente. */
+	// Enviar estado de modos del canal (RPL_CHANNELMODEIS 324)
+	// Construimos la cadena de modos y sus parámetros (si corresponde).
 	std::string modes = "";
 	std::string params = "";
 	if (channel.isInviteOnly())
@@ -335,14 +349,30 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		modes += "l";
 		params += " " + intToString(channel.getLimit());
 	}
+
 	if (!modes.empty())
 	{
+		// Formato: :server 324 <nick> <channel> <modes> [params]
 		std::string reply = ":ircserv 324 " + nick + " " + nameChannel + " +" + modes + params;
 		sendNumeric(clientFd, reply);
 	}
 
-	/* Enviar lista de usuarios del canal al cliente que entra (NAMES) */
-	std::string names = "353 " + nick + " = " + nameChannel + " :";
+	// Enviar TOPIC (332) o NOTOPIC (331)
+	// Muchos clientes esperan este reply antes de procesar NAMES.
+	std::string topic = "";
+	// asumimos que Channel tiene getTopic() que devuelve "" si no hay topic
+	// si no existe, sustituye por la forma correcta de obtener el topic.
+	topic = channel.getTopic();
+	if (!topic.empty())
+		sendNumeric(clientFd, ":ircserv 332 " + nick + " " + nameChannel + " :" + topic); // RPL_TOPIC 332 <nick> <channel> :<topic>
+	else
+		sendNumeric(clientFd, ":ircserv 331 " + nick + " " + nameChannel + " :No topic is set"); // RPL_NOTOPIC 331 <nick> <channel> :No topic is set
+
+	// Enviar lista de usuarios del canal al cliente que entra (NAMES - 353)
+	// Construimos la línea completa de NAMES y la enviamos en un solo sendNumeric
+	// (si lo prefieres puedes enviar en múltiples paquetes, pero aquí respetamos
+	// la forma en que lo tenías originalmente).
+	std::string names = ":ircserv 353 " + nick + " = " + nameChannel + " :";
 
 	std::set<int>::iterator iteratorCreateList = channel.clients.begin();
 	while (iteratorCreateList != channel.clients.end())
@@ -368,9 +398,11 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		++iteratorCreateList;
 	}
 
+	// Enviamos la lista y el marcador de fin de lista.
 	sendNumeric(clientFd, names);
-	sendNumeric(clientFd, "366 " + nick + " " + nameChannel + " :End of /NAMES list");
+	sendNumeric(clientFd, ":ircserv 366 " + nick + " " + nameChannel + " :End of /NAMES list");
 
+	// Mensaje por consola para depuración / logs
 	std::cout << "JOIN: cliente fd " << clientFd << " unido a " << nameChannel << "\n";
 }
 
@@ -480,266 +512,6 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 		_channels.erase(it);
 }
 
-bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string &text, const std::string &prefix, const std::string &target)
-{
-	/* ===========================================================
-		Si el texto comienza con 0x01 (CTCP) y contiene "DCC SEND " en la posición 1,
-		lo consideramos una petición DCC SEND que podemos interceptar.
-		(esta función asume que ya comprobaste que text[0] == '\001' y que
-		 text.find("DCC SEND ",1) == 1)
-		=========================================================== */
-
-	const std::string dccPrefix = "DCC SEND ";
-	size_t pos = 1; // precondición de llamada
-
-	// Extraer la porción después de "DCC SEND "
-	size_t start = pos + dccPrefix.size(); // inicio de los tokens: filename ip port size
-	std::string rest = "";
-	if (start < text.size())
-		rest = text.substr(start);
-
-	// quitar un posible \001 final
-	if (!rest.empty() && rest[rest.size() - 1] == '\001')
-		rest.erase(rest.size() - 1);
-
-	// Tokenizar rest por espacios de forma manual:
-	std::vector<std::string> toks;
-	std::string s = rest;
-	while (!s.empty())
-	{
-		// saltar espacios iniciales
-		while (!s.empty() && (s[0] == ' ' || s[0] == '\t'))
-			s.erase(0, 1);
-		if (s.empty())
-			break;
-		size_t p = s.find(' ');
-		if (p == std::string::npos)
-		{
-			toks.push_back(s);
-			break;
-		}
-		toks.push_back(s.substr(0, p));
-		s.erase(0, p + 1);
-	}
-
-	// Esperamos al menos el filename (toks[0]). ip/port/size son opcionales
-	if (!toks.empty())
-	{
-		std::string filename = toks[0];
-		unsigned long fsize = 0;
-		// si nos dan size (habitualmente en toks[3]) intentamos parsearlo
-		if (toks.size() >= 4)
-		{
-			char *endptr = NULL;
-			fsize = (unsigned long)ftStrtol(toks[3].c_str(), &endptr);
-			if (*endptr != '\0')
-				fsize = 0; // parse error -> 0
-		}
-
-		// Construir la transferencia y crear listener (proxy)
-		FileTransfer ft;
-		ft.id = _nextTransferId++;
-		ft.senderFd = clientFd;
-		ft.receiverFd = dst_fd;
-		ft.filename = filename;
-		ft.filesize = fsize;
-		ft.bytesTransferred = 0;
-		ft.senderClosed = false;
-		ft.receiverClosed = false;
-		ft.listenerCreated = false;
-		ft.bothConnected = false;
-
-		// Intentar crear el listener (ephemeral port)
-		if (ft.createListener() != 0)
-		{
-			// fallo: avisar al emisor y reenviar el PRIVMSG original como fallback
-			sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy failed to create listener");
-			std::string fallback = ":" + prefix + " PRIVMSG " + target + " :" + text;
-			sendNumeric(dst_fd, fallback);
-			return true;
-		}
-
-		// Guardar la transferencia en el mapa del servidor (copiamos metadata).
-		_transfers[ft.id] = ft;
-
-		// transferir ownership del fd al objeto en el mapa
-		_transfers[ft.id].socketFileTransfer = ft.socketFileTransfer;
-		// evitar que el destructor del objeto local cierre el fd (liberar propiedad)
-		ft.socketFileTransfer = -1;
-
-		// ahora sí obtenemos el fd real
-		int lfd = _transfers[ft.id].socketFileTransfer;
-		if (lfd == -1)
-		{
-			// fallback seguro (no debería ocurrir si createListener() tuvo éxito)
-			sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (no listener fd)");
-			return true;
-		}
-
-		// Añadir listener al array de poll para que runLoop() lo gestione
-		pollfd pfd;
-		pfd.fd = lfd;
-		pfd.events = POLLIN;
-		pfd.revents = 0;
-		_fds.push_back(pfd);
-
-		// Mapear el fd del listener a la transferencia
-		_fdToTransferId[lfd] = ft.id;
-
-		/* -------------------------------------------------------------
-			Intentar conectar de forma activa al sender ORIGINAL (si el
-			CTCP incluía IP y PORT). Muchos clientes (el emisor) están en
-			modo "listen" y esperan que el receptor conecte a ellos. Si
-			queremos recibir bytes en el proxy, debemos conectarnos al
-			sender usando la IP/PORT que nos mandó.
-			------------------------------------------------------------- */
-
-		// tratar de recuperar IP y PORT originales del sender si estaban en toks
-		if (toks.size() >= 3)
-		{
-			std::string orig_ip_tok = toks[1];
-			std::string orig_port_tok = toks[2];
-			// convertir IP: puede venir como decimal (host order) o dotted; soportamos ambos
-			struct sockaddr_in sender_addr;
-			std::memset(&sender_addr, 0, sizeof(sender_addr));
-			sender_addr.sin_family = AF_INET;
-			bool haveSenderAddr = false;
-
-			struct in_addr ina;
-			if (parseDccIpToken(orig_ip_tok, ina))
-			{
-				sender_addr.sin_addr = ina;
-				haveSenderAddr = true;
-			}
-
-			int sender_port = 0;
-			if (haveSenderAddr)
-			{
-				char *endptr_port = NULL;
-				sender_port = (int)strtol(orig_port_tok.c_str(), &endptr_port, 10);
-				if (*endptr_port != '\0' || sender_port <= 0 || sender_port > 65535)
-					haveSenderAddr = false;
-				else
-					sender_addr.sin_port = htons((uint16_t)sender_port);
-			}
-
-			if (haveSenderAddr)
-			{
-				// crear socket y conectarnos al sender (non-blocking)
-				int s = socket(AF_INET, SOCK_STREAM, 0);
-				if (s != -1)
-				{
-					// poner non-blocking
-					// int fl = fcntl(s, F_GETFL, 0);
-					// if (fl != -1)
-					// 	fcntl(s, F_SETFL, fl | O_NONBLOCK);
-					fcntl(s, F_SETFL, O_NONBLOCK);
-
-					int cres = connect(s, (struct sockaddr*)&sender_addr, sizeof(sender_addr));
-					if (cres == 0)
-					{
-						// conectado de inmediato
-						_transfers[ft.id].senderFdRedDDC = s;
-						_transfers[ft.id].senderClosed = false;
-
-						pollfd sp;
-						sp.fd = s;
-						sp.events = POLLIN;
-						sp.revents = 0;
-						_fds.push_back(sp);
-
-						_fdToTransferId[s] = ft.id;
-					}
-					else if (errno == EINPROGRESS || errno == EINTR)
-					{
-						// conexión en progreso: vigilamos POLLOUT para saber cuándo termina
-						_transfers[ft.id].senderFdRedDDC = s;
-						_transfers[ft.id].senderClosed = false;
-
-						pollfd sp;
-						sp.fd = s;
-						sp.events = POLLIN | POLLOUT;
-						sp.revents = 0;
-						_fds.push_back(sp);
-
-						_fdToTransferId[s] = ft.id;
-
-					}
-					else
-						close(s);
-				}
-				else
-					sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy could not create outbound socket to sender; proxy will wait for connections");
-			}
-			else
-				sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy couldn't parse sender address from CTCP; proxy will wait for incoming connections");
-		}
-
-		// Obtener IP del servidor para enviar al receptor (si no se puede, usar 127.0.0.1)
-		// NOTA: no usar getsockname(_server_fd) cuando _server_fd está ligado a INADDR_ANY,
-		// porque devolvería 0.0.0.0. En su lugar intentamos averiguar la IP saliente
-		// creando un socket UDP y "conectándolo" a IP pública (no se envía tráfico).
-		std::string serverIp = "127.0.0.1";
-		{
-			int sock = socket(AF_INET, SOCK_DGRAM, 0);
-			if (sock != -1)
-			{
-				struct sockaddr_in remote;
-				std::memset(&remote, 0, sizeof(remote));
-				remote.sin_family = AF_INET;
-				// conectar a una IP pública solo para conocer la interfaz saliente
-				remote.sin_addr.s_addr = inet_addr("8.8.8.8");
-				remote.sin_port = htons(53);
-				// connect no envía paquetes en UDP, solo deja elegir interfaz
-				if (connect(sock, (struct sockaddr*)&remote, sizeof(remote)) != -1)
-				{
-					struct sockaddr_in name;
-					socklen_t namelen = sizeof(name);
-					if (getsockname(sock, (struct sockaddr*)&name, &namelen) != -1)
-					{
-						char ipbuf[INET_ADDRSTRLEN];
-						if (inet_ntop(AF_INET, &name.sin_addr, ipbuf, sizeof(ipbuf)) != NULL)
-							serverIp = ipbuf;
-					}
-				}
-				close(sock);
-			}
-		}
-
-		// Convertir IP (dotted) a entero decimal que usa DCC (ntohl(inet_addr(ip)))
-		uint32_t ip_net = inet_addr(serverIp.c_str()); // network order
-		uint32_t ip_decimal = ntohl(ip_net);          // host order decimal
-
-		// Construir el CTCP DCC SEND modificado para el receptor (le decimos que se conecte al servidor)
-		unsigned short port = _transfers[ft.id].getListenerPort();
-		if (port == 0)
-		{
-			// fallback: puerto inválido
-			sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (listener port=0)");
-			return true;
-		}
-
-		// Formato clásico DCC: IP en decimal (host order) y puerto en decimal.
-		std::string dccmsg = "\001DCC SEND " + filename + " " + intToString((int)ip_decimal) + " " + intToString((int)port) + " " + intToString((int)fsize) + "\001";
-		std::string outmsg = ":" + prefix + " PRIVMSG " + target + " :" + dccmsg;
-
-		// Enviar al receptor el CTCP con IP/puerto del proxy
-		sendNumeric(dst_fd, outmsg);
-
-		// Informar al emisor (opcional, mensaje NOTICE)
-		std::string senderNick = _clients[clientFd].nickname;
-		if (senderNick.empty())
-			senderNick = intToString(clientFd);
-		sendNumeric(clientFd, ":ircserv NOTICE " + senderNick + " :DCC proxy created id=" + intToString((int)ft.id));
-
-		// Fin: no reenviamos el PRIVMSG original (interceptado)
-		return true;
-	}
-
-	// Si no había tokens (no filename) -> no hicimos nada especial
-	return false;
-}
-
 void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 {
 	// Formato: "PRIVMSG <target> :<message>"
@@ -801,9 +573,7 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 			text.erase(text.size() - 1);
 	}
 
-	/* ===========================================================
-		Construcción del prefijo IRC del emisor (nick!user@host)
-		=========================================================== */
+	// Construcción del prefijo IRC del emisor (nick!user@host)
 	std::string nick = _clients[clientFd].nickname;
 	std::string user = _clients[clientFd].username;
 
@@ -815,18 +585,19 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 
 	std::string prefix = nick + "!" + user + "@localhost";
 
-	/* ===========================================================
-		INVOCAR AL BOT (solo si no es CTCP: no procesar mensajes que empiecen por \001)
-		=========================================================== */
+	handlePrivmsgCommandBonus(clientFd, target, text, prefix, nick);
+}
+
+void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, const std::string &text, const std::string &prefix, const std::string &nick)
+{
+	// INVOCAR AL BOT (solo si no es CTCP: no procesar mensajes que empiecen por \001)
 	std::string botReply;
 	bool isCTCP = (!text.empty() && text[0] == '\001');
 
 	if (!isCTCP)
 		botReply = _bot.generateReply(text, nick); // pasamos el texto tal cual al bot; el bot rellenará kickTarget si corresponde
 
-	/* ===========================================================
-		SI EL MENSAJE ES DIRECTAMENTE AL BOT (PRIVADO)
-		=========================================================== */
+	// SI EL MENSAJE ES DIRECTAMENTE AL BOT (PRIVADO)
 	if (target == _bot.getName())
 	{
 		if (!botReply.empty() && !isCTCP)
@@ -840,9 +611,7 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 		return;
 	}
 
-	/* ===========================================================
-		Si target es canal: reenviar como antes (sin DCC)
-		=========================================================== */
+	// Si target es canal: reenviar como antes (sin DCC)
 	if (!target.empty() && (target[0] == '#' || target[0] == '&' || target[0] == '+' || target[0] == '!'))
 	{
 		std::map<std::string, Channel>::iterator channelIterator = _channels.find(target);
@@ -874,7 +643,7 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 				++itb;
 			}
 		}
-			
+
 		// 2) Reenviar el PRIVMSG original a todos los miembros del canal (igual que antes)
 		std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
 
@@ -898,12 +667,8 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 		return;
 	}
 
-	/* ===========================================================
-		Si target es usuario -> comprobar DCC (CTCP dentro del PRIVMSG)
-		Nota: /dcc send del cliente se traduce en un PRIVMSG con CTCP:
-			PRIVMSG nick :\001DCC SEND <file> <ip> <port> <size>\001
-		=========================================================== */
-
+	// Si target es usuario -> comprobar DCC (CTCP dentro del PRIVMSG)
+	// Nota: /dcc send del cliente se traduce en un PRIVMSG con CTCP: PRIVMSG nick :\001DCC SEND <file> <ip> <port> <size>\001
 	int dst_fd = getFdByNick(target);
 	if (dst_fd == -1)
 	{

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/18 11:20:31 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/18 17:34:46 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,7 +40,7 @@ int Server::getFdByNick(const std::string &nick) const
 
 
 // helper para enviar mensajes numéricos o líneas
-void Server::sendNumeric(int fd, const std::string &msg)
+/* void Server::sendNumeric(int fd, const std::string &msg)
 {
 	// Si no conocemos el cliente, ignorar
 	if (_clients.find(fd) == _clients.end())
@@ -118,9 +118,9 @@ void Server::sendNumeric(int fd, const std::string &msg)
 			++j;
 		}
 	}
-}
+} */
 
-/* void Server::sendNumeric(int fd, const std::string &msg)
+void Server::sendNumeric(int fd, const std::string &msg)
 {
 	// Si no conocemos el cliente, ignorar
 	if (_clients.find(fd) == _clients.end())
@@ -194,7 +194,7 @@ void Server::sendNumeric(int fd, const std::string &msg)
 			++j;
 		}
 	}
-} */
+}
 
 Server::Server()
 {
@@ -390,16 +390,12 @@ int Server::runLoop()
 				++i;
 				continue;
 			}
-
-			/* --- Manejo de fds asociados a FileTransfer ---
-			   Este bloque prioriza eventos de transferencias de archivos (listeners, peer, remote).
-			   Si el fd actual pertenece a una transferencia, lo manejamos aquí y continuamos.
-			*/
+			
 			if (handleFileTransferEvent(i))
 				continue;
 
-			/*Error o desconexión en un cliente o en el servidor 
-			POLLERR=conexion rota, POLLHUP=cierras la terminal, POLLNVAL=fd corrupto*/
+			//Error o desconexión en un cliente o en el servidor 
+			// POLLERR=conexion rota, POLLHUP=cierras la terminal, POLLNVAL=fd corrupto
 			if (_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
 			{
 				// Si el fd desconectado tiene asociado algun transfer (mapping), y además es cliente "normal",
@@ -533,38 +529,38 @@ int Server::runLoop()
 						}
 						else
 						{
-							/* como irssi manda CAP para imprimir mensaje en el servidor de que lo ignoramos*/
+							// como irssi manda CAP para imprimir mensaje en el servidor de que lo ignoramos
 							if (line.compare(0, 4, "CAP ") == 0)
 								handleInitialAuthentication(i, line);
-							/* IRSSI(cliente) esta mandando PING y si no contestamos PONG IRSSI(cliente) se desconecta*/
+							// IRSSI(cliente) esta mandando PING y si no contestamos PONG IRSSI(cliente) se desconecta
 							else if (line.compare(0, 5, "PING ") == 0)
 							{
 								std::string ping_target = line.substr(5);
 								sendNumeric(clientFd, "PONG " + ping_target);
 								std::cout << "fd " << clientFd << " -> Respondido PONG a [" << ping_target << "]\n";
 							}
-							/*JOIN = para conectarte a un canal, los canales se llaman con prefijos: # ! & +*/
+							//JOIN = para conectarte a un canal, los canales se llaman con prefijos: # ! & +
 							else if (line.compare(0, 5, "JOIN ") == 0)
 								handleJoinCommand(clientFd, line);
-							/*PART = salir de un canal*/
+							//PART = salir de un canal
 							else if (line.compare(0, 5, "PART ") == 0)
 								handlePartCommand(clientFd, line);
-							/*PRIVMSG = mensaje privado*/
+							//PRIVMSG = mensaje privado
 							else if (line.compare(0, 8, "PRIVMSG ") == 0)
 								handlePrivmsgCommand(clientFd, line);
-							/*KICK = operator expulsa a un regular user de un caanal*/
+							//KICK = operator expulsa a un regular user de un caanal
 							else if (line.compare(0, 5, "KICK ") == 0)
 								handleKickCommand(clientFd, line);
-							/*INVITE = operator invita a un cliente a un canaal*/
+							//INVITE = operator invita a un cliente a un canaal
 							else if (line.compare(0, 7, "INVITE ") == 0)
 								handleInviteCommand(clientFd, line);
-							/*TOPIC = Ver el topic del canal o cambiarlo*/
+							//TOPIC = Ver el topic del canal o cambiarlo
 							else if (line.compare(0, 6, "TOPIC ") == 0)
 								handleTopicCommand(clientFd, line);
-							/*MODE = operator puede cambiar diversas cosas con la flag +i +t +k +o +l*/
+							//MODE = operator puede cambiar diversas cosas con la flag +i +t +k +o +l
 							else if (line.compare(0, 5, "MODE ") == 0)
 								handleModeCommand(clientFd, line);
-							/*una vez ya autorizado respondemos si nos ponen denuevo estos comandos de autorizacion*/
+							//una vez ya autorizado respondemos si nos ponen denuevo estos comandos de autorizacion
 							else if (line.compare(0, 5, "PASS ") == 0 || line.compare(0, 5, "USER ") == 0)
 							{
 								// ERR_ALREADYREGISTERED 462
@@ -574,7 +570,7 @@ int Server::runLoop()
 								// Usamos prefijo de servidor como en otros mensajes de error
 								sendNumeric(clientFd, ":ircserv 462 " + cur + " :You may not reregister");
 							}
-							/*NICK = cambiar el nickname una vez el cliente ya esta registrado*/
+							//NICK = cambiar el nickname una vez el cliente ya esta registrado
 							else if (line.compare(0, 5, "NICK ") == 0)
 							{
 								// Guardamos el nick actual poder saber si cambia
@@ -613,7 +609,7 @@ int Server::runLoop()
 									}
 								}
 							}
-							/*Comandos no implementados o desconocidgos*/
+							//Comandos no implementados o desconocidgos
 							else
 								sendNumeric(clientFd, "421 :Unknown command");
 						}
@@ -696,7 +692,7 @@ int Server::runLoop()
 					}
 				}
 
-				/*Si ya terminé de enviar todo al cliente, deja de preguntarle al sistema si puedo escribir*/
+				//Si ya terminé de enviar todo al cliente, deja de preguntarle al sistema si puedo escribir
 				if (_clients.find(fd) != _clients.end() && _clients[fd].outbuf.empty())
 					_fds[i].events &= ~POLLOUT; /*esta linea=Deja de vigilar escritura para este socket y la ~ es para invertir todos los bits de POLLOUT*/
 			}
@@ -705,7 +701,7 @@ int Server::runLoop()
 			++i;
 		}
 	}
-	/*Mensaje de que el servidor se ha cerrado con Ctr+c o kill o Ctr+\*/
+	//Mensaje de que el servidor se ha cerrado con Ctr+c o Ctr+\ o kill
 	std::string shutdown_msg = "ERROR :Server is shutting down\r\n";
 	std::map<int, Client>::iterator it = _clients.begin();
 	while (it != _clients.end())

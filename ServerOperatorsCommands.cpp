@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerOperatorsCommands.cpp                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/09 14:39:18 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/18 12:00:45 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/18 17:39:33 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,7 +14,6 @@
 
 void	Server::handleKickCommand(int clientFd, const std::string &line)
 {
-	// "KICK " tiene longitud 5
 	const size_t prefix_len = 5;
 	if (line.size() <= prefix_len)
 	{
@@ -37,12 +36,10 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 	while (!channelName.empty() && (channelName[channelName.size() - 1] == ' ' || channelName[channelName.size() - 1] == '\t'))
 		channelName.erase(channelName.size() - 1, 1);
 
-	// extraer nick objetivo y comentario opcional
 	std::string targetNick;
 	std::string comment;
 
-	// buscar ':' que indica inicio de comment
-	size_t colon = line.find(':', space + 1);
+	size_t colon = line.find(':', space + 1); // buscar ':' que indica inicio de comment
 
 	if (colon == std::string::npos)
 	{
@@ -65,8 +62,6 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 		if (!comment.empty() && comment[comment.size() - 1] == '\r')
 			comment.erase(comment.size() - 1, 1);
 	}
-
-	// trim sencillo en targetNick
 	while (!targetNick.empty() && (targetNick[0] == ' ' || targetNick[0] == '\t'))
 		targetNick.erase(0, 1);
 	while (!targetNick.empty() && (targetNick[targetNick.size() - 1] == ' ' || targetNick[targetNick.size() - 1] == '\t'))
@@ -77,7 +72,6 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 		sendNumeric(clientFd, "461 KICK :Not enough parameters");
 		return;
 	}
-
 	// ver si existe el canal
 	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
 	if (it == _channels.end())
@@ -86,21 +80,18 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 		return;
 	}
 	Channel &channel = it->second;
-
 	// el emisor está en el canal?
 	if (!channel.hasClient(clientFd))
 	{
 		sendNumeric(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
-
 	// el emisor es operador?
 	if (!channel.isOperator(clientFd))
 	{
 		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
-
 	// existe el nick objetivo en el servidor?
 	int targetFd = getFdByNick(targetNick);
 	if (targetFd == -1)
@@ -108,14 +99,12 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 		sendNumeric(clientFd, "401 " + targetNick + " :No such nick");
 		return;
 	}
-
 	// el objetivo está en el canal?
 	if (!channel.hasClient(targetFd))
 	{
 		sendNumeric(clientFd, "441 " + targetNick + " " + channelName + " :They aren't on that channel");
 		return;
 	}
-
 	// Construir prefijo: nick!user@localhost (igual que en otros comandos)
 	std::string emNick = _clients[clientFd].nickname;
 	std::string emUser = _clients[clientFd].username;
@@ -142,17 +131,13 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 		++sit;
 	}
 
-	// Quitar al cliente del canal (y si era operador, Channel::removeClient ya lo quita de operators)
-	channel.removeClient(targetFd);
-
-	// Si el canal queda vacío, eliminarlo del mapa
-	if (channel.clients.empty())
+	channel.removeClient(targetFd); // Quitar al cliente del canal (y si era operador, Channel::removeClient ya lo quita de operators)
+	if (channel.clients.empty()) // Si el canal queda vacío, eliminarlo del mapa
 		_channels.erase(it);
 }
 
 void	Server::handleInviteCommand(int clientFd, const std::string &line)
 {
-	// "INVITE " tiene longitud 7
 	const size_t prefix_len = 7;
 	if (line.size() <= prefix_len)
 	{
@@ -239,8 +224,7 @@ void	Server::handleInviteCommand(int clientFd, const std::string &line)
 	// el objetivo ya está en el canal?
 	if (channel.hasClient(targetFd))
 	{
-		// ERR_USERONCHANNEL 443
-		sendNumeric(clientFd, "443 " + targetNick + " " + channelName + " :is already on channel");
+		sendNumeric(clientFd, "443 " + targetNick + " " + channelName + " :is already on channel"); // ERR_USERONCHANNEL 443
 		return;
 	}
 
@@ -271,7 +255,7 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	// Formatos posibles:
 	// "TOPIC <#channel>"              -> ver topic
 	// "TOPIC <#channel> :<new topic>" -> cambiar topic (el ':' puede ser obligatorio en clientes)
-	const size_t prefix_len = 6; // strlen("TOPIC ")
+	const size_t prefix_len = 6;
 	if (line.size() <= prefix_len)
 	{
 		sendNumeric(clientFd, "461 TOPIC :Not enough parameters");
@@ -316,8 +300,7 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
 	if (it == _channels.end())
 	{
-		// ERR_NOSUCHCHANNEL 403
-		sendNumeric(clientFd, "403 " + channelName + " :No such channel");
+		sendNumeric(clientFd, "403 " + channelName + " :No such channel"); // ERR_NOSUCHCHANNEL 403
 		return;
 	}
 	Channel &channel = it->second;
@@ -325,8 +308,7 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	// el emisor está en el canal?
 	if (!channel.hasClient(clientFd))
 	{
-		// ERR_NOTONCHANNEL 442
-		sendNumeric(clientFd, "442 " + channelName + " :You're not on that channel");
+		sendNumeric(clientFd, "442 " + channelName + " :You're not on that channel"); // ERR_NOTONCHANNEL 442
 		return;
 	}
 
@@ -344,15 +326,12 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	{
 		if (channel.hasTopic())
 		{
-			// RPL_TOPIC 332 : ":server 332 <nick> <channel> :<topic>"
-			std::string reply = ":ircserv 332 " + nick + " " + channelName + " :" + channel.getTopic();
+			std::string reply = ":ircserv 332 " + nick + " " + channelName + " :" + channel.getTopic(); // RPL_TOPIC 332
 			sendNumeric(clientFd, reply);
-			// (Opcional) podríamos enviar RPL_TOPICWHOTIME (333) con who/time; omitido por simplicidad
 		}
 		else
 		{
-			// RPL_NOTOPIC 331
-			std::string reply = ":ircserv 331 " + nick + " " + channelName + " :No topic is set";
+			std::string reply = ":ircserv 331 " + nick + " " + channelName + " :No topic is set"; // RPL_NOTOPIC 331
 			sendNumeric(clientFd, reply);
 		}
 		return;
@@ -367,13 +346,11 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	// Si el canal tiene topic_restricted y el emisor NO es operador -> error
 	if (channel.isTopicRestricted() && !channel.isOperator(clientFd))
 	{
-		// ERR_CHANOPRIVSNEEDED 482
-		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
+		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator"); // ERR_CHANOPRIVSNEEDED 482
 		return;
 	}
 
-	// Setear el topic (guardamos también quién lo puso)
-	channel.setTopic(newTopic, nick);
+	channel.setTopic(newTopic, nick); // Setear el topic (guardamos también quién lo puso)
 
 	// Notificar a todos los miembros del canal del nuevo topic
 	// Mensaje formato: :nick!user@localhost TOPIC <channel> :<topic>
@@ -490,16 +467,18 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		return;
 	}
 
-	// ------------------------------
-	// A partir de aquí -> se intenta CAMBIAR modos (rest NO está vacío)
-	// Tokenizar rest *manualmente* (sin usar split) — tokens separados por espacios
-	// ------------------------------
+	// llamar a la segunda mitad (cambio de modos)
+	handleModeChange(clientFd, channel, channelName, rest, nick, prefix);
+}
+
+void Server::handleModeChange(int clientFd, Channel &channel, const std::string &channelName, const std::string &rest, const std::string &nick, const std::string &prefix)
+{
+	// A partir de aquí -> se intenta CAMBIAR modos
 	std::vector<std::string> tokens;
 	std::string s = rest;
 	while (!s.empty())
 	{
-		// saltar espacios iniciales
-		while (!s.empty() && (s[0] == ' ' || s[0] == '\t'))
+		while (!s.empty() && (s[0] == ' ' || s[0] == '\t')) // saltar espacios iniciales
 			s.erase(0, 1);
 		if (s.empty())
 			break;
@@ -526,7 +505,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 	size_t paramIndex = 1;
 	bool plus = true;
 
-	/*excepcion de ignorar el mode #test b*/
+	// excepcion de ignorar el mode #test b
 	bool onlyB = true;
 	bool hasPlusSign = false;
 	size_t k = 0;
@@ -543,7 +522,6 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 			++k;
 			continue;
 		}
-		// si aparece cualquier flag distinta de 'b' -> no es solo 'b'
 		if (modeToken[k] != 'b')
 		{
 			onlyB = false;
@@ -552,25 +530,15 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		++k;
 	}
 
-	// Por seguridad/consistencia: solo operadores pueden cambiar modos.
-	// EXCEPCIÓN: si es únicamente "+b" (o combinación de +/- y solo 'b') y el usuario
-	// NO es operador, ignoramos silenciosamente en lugar de enviar 482.
-	if (!channel.isOperator(clientFd))
+	if (!channel.isOperator(clientFd)) //solo operadores pueden cambiar modos.
 	{
 		if (onlyB && hasPlusSign)
-		{
-			// ignorar silenciosamente +b de no-operadores (no enviamos 482)
-			return;
-		}
-		// cualquier otro intento de cambiar modos requiere operador
-		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
+			return; // ignorar silenciosamente +b de no operadores
+		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator"); // cualquier otro intento de cambiar modos requiere operador
 		return;
 	}
 
-	// ------------------------------
-	// A partir de aquí el emisor SÍ es operador -> aplicar cambios
-	// ------------------------------
-	size_t i = 0;
+	size_t i = 0; // A partir de aquí el emisor SÍ es operador -> aplicar cambios
 	while (i < modeToken.size())
 	{
 		if (modeToken[i] == '+')
@@ -586,8 +554,6 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 			++i;
 			continue;
 		}
-
-		// Para los modos que requieren parámetro, obtenerlo desde tokens[paramIndex]
 		if (modeToken[i] == 'i')
 			mode_i(clientFd, channel, channelName, plus, prefix);
 		else if (modeToken[i] == 't')
@@ -632,8 +598,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		}
 		else
 		{
-			// modo desconocido -> RPL_UNKNOWNMODE (usamos 472 como en implementaciones simples)
-			std::string unknown = ":ircserv 472 " + nick + " " + std::string(1, modeToken[i]) + " :is unknown mode char to me";
+			std::string unknown = ":ircserv 472 " + nick + " " + std::string(1, modeToken[i]) + " :is unknown mode char to me"; //RPL_UNKNOWNMODE 472
 			sendNumeric(clientFd, unknown);
 		}
 		++i;

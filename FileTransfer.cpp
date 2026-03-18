@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   FileTransfer.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: alejaro2 <alejaro2@student.42.fr>          +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/17 17:09:14 by alejaro2         ###   ########.fr       */
+/*   Updated: 2026/03/18 17:31:55 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -104,7 +104,7 @@ int FileTransfer::setNonBlocking(int fd)
 	return (0);
 }
 
-/* Crear listener para el proxy DCC */
+// Crear listener para el proxy DCC
 int FileTransfer::createListener()
 {
 	if (socketFileTransfer != -1)
@@ -119,8 +119,8 @@ int FileTransfer::createListener()
 
 	int opt = 1;
 	setsockopt(socketFileTransfer, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)); 
-	/*socketFileTransfer=socket, SOL_SOCKET=aplica a todo el socket(no solo al puerto o ip o protocolo),
-	SO_REUSEADDR=permite reusar ip y puerto, &opt=activarlo, sizeof(opt)=tamaño valor*/
+	// socketFileTransfer=socket, SOL_SOCKET=aplica a todo el socket(no solo al puerto o ip o protocolo),
+	// SO_REUSEADDR=permite reusar ip y puerto, &opt=activarlo, sizeof(opt)=tamaño valor
 
 	if (setNonBlocking(socketFileTransfer) == -1)
 	{
@@ -156,7 +156,7 @@ int FileTransfer::createListener()
 	return 0;
 }
 
-/* Obtener puerto asignado */
+// Obtener puerto asignado
 unsigned short FileTransfer::getListenerPort() const
 {
 	if (socketFileTransfer < 0)
@@ -171,7 +171,7 @@ unsigned short FileTransfer::getListenerPort() const
 	return (ntohs(addr.sin_port));
 }
 
-/* Cerrar todos los sockets propietarios de la transferencia */
+// Cerrar todos los sockets propietarios de la transferencia
 void FileTransfer::closeAll()
 {
 	if (socketFileTransfer != -1)
@@ -201,7 +201,7 @@ void FileTransfer::closeAll()
 	finished = true;
 }
 
-/* Saber si sigue activa */
+// Saber si sigue activa
 bool FileTransfer::isActive() const
 {
 	if (finished)

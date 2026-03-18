@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/17 11:05:49 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/18 17:30:18 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -56,13 +56,16 @@ class Server
 		void	handleNickCommand(int clientFd, const std::string &line);
 		void	handleUserCommand(int clientFd, const std::string &line);
 		void	handleJoinCommand(int clientFd, const std::string &line);
+		void	sendJoinReplies(int clientFd, const std::string &nameChannel);;
 		void	handlePartCommand(int clientFd, const std::string &line);
 		void	handlePrivmsgCommand(int clientFd, const std::string &line);
+		void	handlePrivmsgCommandBonus(int clientFd, const std::string &target, const std::string &text, const std::string &prefix, const std::string &nick);
 		bool	handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string &text, const std::string &prefix, const std::string &target);
 		void	handleKickCommand(int clientFd, const std::string &line);
 		void	handleInviteCommand(int clientFd, const std::string &line);
 		void	handleTopicCommand(int clientFd, const std::string &line);
 		void	handleModeCommand(int clientFd, const std::string &line);
+		void	handleModeChange(int clientFd, Channel &channel, const std::string &channelName, const std::string &rest, const std::string &nick, const std::string &prefix);
 		void	mode_i(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &prefix);
 		void	mode_t(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &prefix);
 		void	mode_k(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &param, const std::string &prefix);
@@ -70,6 +73,7 @@ class Server
 		void	mode_l(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &param, const std::string &prefix);
 		void	mode_user(int clientFd, const std::string &target, const std::string &rest);
 		bool	handleFileTransferEvent(size_t &i);
+		bool	handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid);
 		bool	flushBufferToFd(std::vector<struct pollfd> &fds, FileTransfer &ft, std::string &buffer, int dst, bool countBytes);
 		void	setPollEvents(std::vector<struct pollfd> &fds, int fd, short events);
 		void	removePollFd(std::vector<struct pollfd> &fds, int fd);
