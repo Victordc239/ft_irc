@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/18 17:30:26 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/19 15:00:32 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -61,20 +61,13 @@ bool Server::handleInitialAuthentication(size_t &i, const std::string &line)
 
 		if (subcmd == "LS")
 		{
-			// Respondemos exactamente como hace irssi por defecto cuando pedimos LS:
-			sendNumeric(clientFd, "CAP * LS :");
+			sendNumeric(clientFd, "CAP * LS :"); // Respondemos exactamente como hace irssi por defecto cuando pedimos LS:
 			std::cout << "fd " << clientFd << " CAP LS recibido (ignorando)\n";
 		}
 		else if (subcmd == "END")
-		{
-			// No respondemos nada, solo lo ignoramos
-			std::cout << "fd " << clientFd << " CAP END recibido (ignorando)\n";
-		}
+			std::cout << "fd " << clientFd << " CAP END recibido (ignorando)\n"; // No respondemos nada, solo lo ignoramos
 		else
-		{
-			// Otros subcomandos CAP: ignorar pero loguear
-			std::cout << "fd " << clientFd << " CAP " << subcmd << " recibido (ignorando)\n";
-		}
+			std::cout << "fd " << clientFd << " CAP " << subcmd << " recibido (ignorando)\n"; // Otros subcomandos CAP: ignorar pero loguear
 	}
 	return (false);
 }

@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/18 17:30:18 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/19 14:45:52 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -61,6 +61,7 @@ class Server
 		void	handlePrivmsgCommand(int clientFd, const std::string &line);
 		void	handlePrivmsgCommandBonus(int clientFd, const std::string &target, const std::string &text, const std::string &prefix, const std::string &nick);
 		bool	handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string &text, const std::string &prefix, const std::string &target);
+		bool	handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std::vector<std::string> &toks, const std::string &prefix, const std::string &target, const std::string &filename, unsigned long fsize, unsigned long transferId);
 		void	handleKickCommand(int clientFd, const std::string &line);
 		void	handleInviteCommand(int clientFd, const std::string &line);
 		void	handleTopicCommand(int clientFd, const std::string &line);
@@ -87,6 +88,7 @@ class Server
 
 		bool	initAndListen(long port, const std::string &password);
 		int	setNonblock(int fd);
+		bool	handleClientReadEvent(size_t i);
 		int	runLoop();
 
 };

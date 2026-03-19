@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/18 17:34:46 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/19 14:59:11 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -369,6 +369,176 @@ bool Server::initAndListen(long port, const std::string &password)
 	return (true);
 }
 
+bool Server::handleClientReadEvent(size_t i)
+{
+	// Lectura normal en cliente (POLLIN)
+	if (!(_fds[i].revents & POLLIN))
+		return false;
+
+	int clientFd = _fds[i].fd;
+	ssize_t n = recv(clientFd, _buf, BUF_SIZE, 0); //la cantidad de bytes que ha enviado el cliente al servidor
+
+	if (n > 0)
+	{
+		_clients[clientFd].accum.append(_buf, _buf + n);
+		size_t pos;
+		while ((pos = _clients[clientFd].accum.find('\n')) != std::string::npos)
+		{
+			std::string line = _clients[clientFd].accum.substr(0, pos);
+			if (!line.empty() && line[line.size() - 1] == '\r')
+				line.erase(line.size() - 1);
+
+			std::cout << "fd " << clientFd << " -> Línea recibida: [" << line << "]\n";
+			if (!_clients[clientFd].registered)
+			{
+				// Siempre permitir PASS y CAP antes del registro
+				handleInitialAuthentication(i, line);
+
+				// Cliente NO registrado aún.
+				if (line.compare(0, 5, "NICK ") == 0)
+					handleNickCommand(clientFd, line);
+				else if (line.compare(0, 5, "USER ") == 0)
+					handleUserCommand(clientFd, line);
+				else if (line.compare(0, 4, "JOIN") == 0 || line.compare(0, 7, "PRIVMSG") == 0 || line.compare(0, 4, "KICK") == 0 || line.compare(0, 6, "INVITE") == 0
+						|| line.compare(0, 5, "TOPIC") == 0 || line.compare(0, 4, "MODE") == 0 || line.compare(0, 4, "PART") == 0)
+				{
+					Client &client = _clients[clientFd];
+					std::cout << "fd " << clientFd << " intentó usar [" << line << "] sin registrarse. Falta: ";
+					if (!client.correctPass)
+						std::cout << "PASS ";
+					if (client.nickname.empty())
+						std::cout << "NICK ";
+					if (client.username.empty())
+						std::cout << "USER ";
+					std::cout << std::endl;
+					sendNumeric(clientFd, "451 :You have not registered"); // ERR_NOTREGISTERED 451
+				}
+
+				// Si ya tenemos PASS correcto + NICK + USER → registrar
+				if (_clients[clientFd].correctPass && !_clients[clientFd].nickname.empty() && !_clients[clientFd].username.empty())
+				{
+					_clients[clientFd].registered = true;
+					std::string welcome = "001 " + _clients[clientFd].nickname + " :Welcome to the simple IRCd";
+					sendNumeric(clientFd, welcome);
+					std::cout << "fd " << clientFd << " registrado (PASS+NICK+USER). Enviada 001.\n"; // enviar RPL_WELCOME (001)
+				}
+			}
+			else
+			{
+				// como irssi manda CAP para imprimir mensaje en el servidor de que lo ignoramos
+				if (line.compare(0, 4, "CAP ") == 0)
+					handleInitialAuthentication(i, line);
+				//JOIN = para conectarte a un canal, los canales se llaman con prefijos: # ! & +
+				else if (line.compare(0, 5, "JOIN ") == 0)
+					handleJoinCommand(clientFd, line);
+				//PART = salir de un canal
+				else if (line.compare(0, 5, "PART ") == 0)
+					handlePartCommand(clientFd, line);
+				//PRIVMSG = mensaje privado
+				else if (line.compare(0, 8, "PRIVMSG ") == 0)
+					handlePrivmsgCommand(clientFd, line);
+				//KICK = operator expulsa a un regular user de un caanal
+				else if (line.compare(0, 5, "KICK ") == 0)
+					handleKickCommand(clientFd, line);
+				//INVITE = operator invita a un cliente a un canaal
+				else if (line.compare(0, 7, "INVITE ") == 0)
+					handleInviteCommand(clientFd, line);
+				//TOPIC = Ver el topic del canal o cambiarlo
+				else if (line.compare(0, 6, "TOPIC ") == 0)
+					handleTopicCommand(clientFd, line);
+				//MODE = operator puede cambiar diversas cosas con la flag +i +t +k +o +l
+				else if (line.compare(0, 5, "MODE ") == 0)
+					handleModeCommand(clientFd, line);
+				// IRSSI(cliente) esta mandando PING y si no contestamos PONG IRSSI(cliente) se desconecta
+				else if (line.compare(0, 5, "PING ") == 0)
+				{
+					std::string ping_target = line.substr(5);
+					sendNumeric(clientFd, "PONG " + ping_target);
+					std::cout << "fd " << clientFd << " -> Respondido PONG a [" << ping_target << "]\n";
+				}
+				//una vez ya autorizado respondemos si nos ponen denuevo estos comandos de autorizacion
+				else if (line.compare(0, 5, "PASS ") == 0 || line.compare(0, 5, "USER ") == 0)
+				{
+					std::string cur = _clients[clientFd].nickname;
+					if (cur.empty())
+						cur = "*";
+					sendNumeric(clientFd, ":ircserv 462 " + cur + " :You may not reregister"); // ERR_ALREADYREGISTERED 462
+				}
+				//NICK = cambiar el nickname una vez el cliente ya esta registrado
+				else if (line.compare(0, 5, "NICK ") == 0)
+				{
+					// Guardamos el nick actual poder saber si cambia
+					std::string originalNick = _clients[clientFd].nickname;
+
+					// Construimos el prefijo antiguo nick!user@host
+					std::string displayOldNick;
+					if (originalNick.empty())
+						displayOldNick = intToString(clientFd);
+					else
+						displayOldNick = originalNick;
+
+					std::string user;
+					if (_clients[clientFd].username.empty())
+						user = "user";
+					else
+						user = _clients[clientFd].username;
+
+					std::string oldPrefix = displayOldNick + "!" + user + "@localhost";
+
+					// Reutilizamos la función que ya valida y asigna el nuevo nick
+					handleNickCommand(clientFd, line);
+
+					// Si el nick cambió correctamente notificamos a los demás clientes
+					std::string newNick = _clients[clientFd].nickname;
+					if (newNick != originalNick && !newNick.empty())
+					{
+						std::string out = ":" + oldPrefix + " NICK " + newNick;
+						std::map<int, Client>::iterator it = _clients.begin();
+						while (it != _clients.end())
+						{
+							sendNumeric(it->first, out);
+							++it;
+						}
+					}
+				}
+				else
+					sendNumeric(clientFd, "421 :Unknown command"); //Comandos no implementados o desconocidgos
+			}
+			_clients[clientFd].accum.erase(0, pos + 1);
+		}
+	}
+	else if (n == 0) // Cliente cerró conexión de forma ordenada -> limpiar también transfers relacionados
+	{
+		int closedFd = clientFd;
+		std::cout << "Cliente (fd " << closedFd << ") cerró conexión\n";
+
+		cleanupTransfersForClient(closedFd); // Limpiar transfers que referencien este cliente como sender/receiver
+
+		close(closedFd); // ahora cerrar y borrar cliente
+		_clients.erase(closedFd);
+		_fdToTransferId.erase(closedFd);
+		_fds.erase(_fds.begin() + i);
+		return (true);
+	}
+	else
+	{
+		if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+		{
+			std::cerr << "ERROR: recv falló\n";
+			int bad = clientFd;
+
+			cleanupTransfersForClient(bad); // limpiar transfers asociados
+
+			close(clientFd); // cerrar el cliente problemático
+			_clients.erase(clientFd);
+			_fdToTransferId.erase(clientFd);
+			_fds.erase(_fds.begin() + i);
+			return (true);
+		}
+	}
+	return (false);
+}
+
 int Server::runLoop()
 {
 	while (g_running)
@@ -390,7 +560,6 @@ int Server::runLoop()
 				++i;
 				continue;
 			}
-			
 			if (handleFileTransferEvent(i))
 				continue;
 
@@ -398,8 +567,7 @@ int Server::runLoop()
 			// POLLERR=conexion rota, POLLHUP=cierras la terminal, POLLNVAL=fd corrupto
 			if (_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
 			{
-				// Si el fd desconectado tiene asociado algun transfer (mapping), y además es cliente "normal",
-				// debemos limpiar las transferencias relacionadas (sender o receiver)
+				// Si el fd desconectado tiene asociado algun transfer (mapping), y además es cliente "normal", debemos limpiar las transferencias relacionadas (sender o receiver)
 				int badfd = _fds[i].fd;
 
 				// Si el fd es server_fd -> error crítico
@@ -409,22 +577,17 @@ int Server::runLoop()
 					g_running = 0;
 					break;
 				}
-
-				// Antes de cerrar, limpiar transfers que referencien este cliente como sender/receiver
-				cleanupTransfersForClient(badfd);
+				cleanupTransfersForClient(badfd); // Antes de cerrar, limpiar transfers que referencien este cliente como sender/receiver
 
 				// Ahora cerramos y borramos el cliente (como antes)
 				std::cout << "Cliente (fd " << badfd << ") se desconectó/err\n";
 				close(badfd);
 				_clients.erase(badfd);
-				_fdToTransferId.erase(badfd); // por si acaso
+				_fdToTransferId.erase(badfd);
 				_fds.erase(_fds.begin() + i);
-				// no incrementar i (ya apuntamos al siguiente elemento tras erase)
 				continue;
 			}
-
-			// Nueva conexión entrante, POLLIN=poll recibe datos a leer
-			if (_fds[i].fd == _server_fd && (_fds[i].revents & POLLIN))
+			if (_fds[i].fd == _server_fd && (_fds[i].revents & POLLIN)) // Nueva conexión entrante, POLLIN=poll recibe datos a leer
 			{
 				while (true)
 				{
@@ -438,14 +601,12 @@ int Server::runLoop()
 						std::cerr << "ERROR en accept nuevo cliente\n";
 						break;
 					}
-
 					if (Server::setNonblock(client_fd) == -1)
 					{
 						std::cerr << "WARNING: no se pudo poner client_fd non-blocking\n";
 						close(client_fd);
 						break;
 					}
-
 					pollfd cp;
 					cp.fd = client_fd;
 					cp.events = POLLIN;
@@ -463,194 +624,8 @@ int Server::runLoop()
 				++i;
 				continue;
 			}
-
-			// Lectura normal en cliente (POLLIN)
-			if (_fds[i].revents & POLLIN)
-			{
-				int clientFd = _fds[i].fd;
-				ssize_t n = recv(clientFd, _buf, BUF_SIZE, 0); //la cantidad de bytes que ha enviado el cliente al servidor
-
-				if (n > 0)
-				{
-					_clients[clientFd].accum.append(_buf, _buf + n);
-
-					size_t pos;
-					while ((pos = _clients[clientFd].accum.find('\n')) != std::string::npos)
-					{
-						std::string line = _clients[clientFd].accum.substr(0, pos);
-						if (!line.empty() && line[line.size() - 1] == '\r')
-							line.erase(line.size() - 1);
-
-						std::cout << "fd " << clientFd << " -> Línea recibida: [" << line << "]\n";
-
-						if (!_clients[clientFd].registered)
-						{
-							// Siempre permitir PASS y CAP antes del registro
-							handleInitialAuthentication(i, line);
-
-							// Cliente NO registrado aún.
-							if (line.compare(0, 5, "NICK ") == 0)
-								handleNickCommand(clientFd, line);
-							else if (line.compare(0, 5, "USER ") == 0)
-								handleUserCommand(clientFd, line);
-							else if (line.compare(0, 4, "JOIN") == 0 || line.compare(0, 7, "PRIVMSG") == 0 ||
-									line.compare(0, 4, "KICK") == 0 || line.compare(0, 6, "INVITE") == 0 ||
-									line.compare(0, 5, "TOPIC") == 0 || line.compare(0, 4, "MODE") == 0 ||
-									line.compare(0, 4, "PART") == 0)
-							{
-
-								Client &client = _clients[clientFd];
-
-								std::cout << "fd " << clientFd << " intentó usar [" << line << "] sin registrarse. Falta: ";
-								if (!client.correctPass)
-									std::cout << "PASS ";
-								if (client.nickname.empty())
-									std::cout << "NICK ";
-								if (client.username.empty())
-									std::cout << "USER ";
-								std::cout << std::endl;
-
-								// ERR_NOTREGISTERED 451
-								sendNumeric(clientFd, "451 :You have not registered");
-							}
-
-							// Si ya tenemos PASS correcto + NICK + USER → registrar
-							if (_clients[clientFd].correctPass && !_clients[clientFd].nickname.empty() && !_clients[clientFd].username.empty())
-							{
-								_clients[clientFd].registered = true;
-
-								// enviar RPL_WELCOME (001) -- formato simplificado
-								std::string welcome = "001 " + _clients[clientFd].nickname + " :Welcome to the simple IRCd";
-
-								sendNumeric(clientFd, welcome);
-
-								std::cout << "fd " << clientFd << " registrado (PASS+NICK+USER). Enviada 001.\n";
-							}
-						}
-						else
-						{
-							// como irssi manda CAP para imprimir mensaje en el servidor de que lo ignoramos
-							if (line.compare(0, 4, "CAP ") == 0)
-								handleInitialAuthentication(i, line);
-							// IRSSI(cliente) esta mandando PING y si no contestamos PONG IRSSI(cliente) se desconecta
-							else if (line.compare(0, 5, "PING ") == 0)
-							{
-								std::string ping_target = line.substr(5);
-								sendNumeric(clientFd, "PONG " + ping_target);
-								std::cout << "fd " << clientFd << " -> Respondido PONG a [" << ping_target << "]\n";
-							}
-							//JOIN = para conectarte a un canal, los canales se llaman con prefijos: # ! & +
-							else if (line.compare(0, 5, "JOIN ") == 0)
-								handleJoinCommand(clientFd, line);
-							//PART = salir de un canal
-							else if (line.compare(0, 5, "PART ") == 0)
-								handlePartCommand(clientFd, line);
-							//PRIVMSG = mensaje privado
-							else if (line.compare(0, 8, "PRIVMSG ") == 0)
-								handlePrivmsgCommand(clientFd, line);
-							//KICK = operator expulsa a un regular user de un caanal
-							else if (line.compare(0, 5, "KICK ") == 0)
-								handleKickCommand(clientFd, line);
-							//INVITE = operator invita a un cliente a un canaal
-							else if (line.compare(0, 7, "INVITE ") == 0)
-								handleInviteCommand(clientFd, line);
-							//TOPIC = Ver el topic del canal o cambiarlo
-							else if (line.compare(0, 6, "TOPIC ") == 0)
-								handleTopicCommand(clientFd, line);
-							//MODE = operator puede cambiar diversas cosas con la flag +i +t +k +o +l
-							else if (line.compare(0, 5, "MODE ") == 0)
-								handleModeCommand(clientFd, line);
-							//una vez ya autorizado respondemos si nos ponen denuevo estos comandos de autorizacion
-							else if (line.compare(0, 5, "PASS ") == 0 || line.compare(0, 5, "USER ") == 0)
-							{
-								// ERR_ALREADYREGISTERED 462
-								std::string cur = _clients[clientFd].nickname;
-								if (cur.empty())
-									cur = "*";
-								// Usamos prefijo de servidor como en otros mensajes de error
-								sendNumeric(clientFd, ":ircserv 462 " + cur + " :You may not reregister");
-							}
-							//NICK = cambiar el nickname una vez el cliente ya esta registrado
-							else if (line.compare(0, 5, "NICK ") == 0)
-							{
-								// Guardamos el nick actual poder saber si cambia
-								std::string originalNick = _clients[clientFd].nickname;
-
-								// Construimos el prefijo antiguo nick!user@host
-								std::string displayOldNick;
-								if (originalNick.empty())
-									displayOldNick = intToString(clientFd);
-								else
-									displayOldNick = originalNick;
-
-								std::string user;
-								if (_clients[clientFd].username.empty())
-									user = "user";
-								else
-									user = _clients[clientFd].username;
-
-								std::string oldPrefix = displayOldNick + "!" + user + "@localhost";
-
-								// Reutilizamos la función que ya valida y asigna el nuevo nick
-								handleNickCommand(clientFd, line);
-
-								// Si el nick cambió correctamente notificamos a los demás clientes
-								std::string newNick = _clients[clientFd].nickname;
-								if (newNick != originalNick && !newNick.empty())
-								{
-									std::string out = ":" + oldPrefix + " NICK " + newNick;
-
-									// Broadcast simple a todos los clientes conectados
-									std::map<int, Client>::iterator it = _clients.begin();
-									while (it != _clients.end())
-									{
-										sendNumeric(it->first, out);
-										++it;
-									}
-								}
-							}
-							//Comandos no implementados o desconocidgos
-							else
-								sendNumeric(clientFd, "421 :Unknown command");
-						}
-						_clients[clientFd].accum.erase(0, pos + 1);
-					}
-				}
-				else if (n == 0)
-				{
-					// Cliente cerró conexión de forma ordenada -> limpiar también transfers relacionados
-					int closedFd = clientFd;
-					std::cout << "Cliente (fd " << closedFd << ") cerró conexión\n";
-
-					// Limpiar transfers que referencien este cliente como sender/receiver
-					cleanupTransfersForClient(closedFd);
-
-					// ahora cerrar y borrar cliente
-					close(closedFd);
-					_clients.erase(closedFd);
-					_fdToTransferId.erase(closedFd); // por si acaso estaba mapeado
-					_fds.erase(_fds.begin() + i);
-					continue;
-				}
-				else
-				{
-					if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
-					{
-						std::cerr << "ERROR: recv falló\n";
-						int bad = clientFd;
-						// limpiar transfers asociados igual que en EOF
-						cleanupTransfersForClient(bad);
-
-						// cerrar el cliente problemático
-						close(clientFd);
-						_clients.erase(clientFd);
-						_fdToTransferId.erase(clientFd);
-						_fds.erase(_fds.begin() + i);
-						continue;
-					}
-				}
-			}
-
+			if (handleClientReadEvent(i)) // Lectura normal en cliente (POLLIN)
+				continue;
 			// Manejo de POLLOUT para sockets de cliente normales (enviar buffer de servidor->cliente)
 			if (_fds[i].revents & POLLOUT)
 			{
@@ -682,9 +657,8 @@ int Server::runLoop()
 						close(badfd);
 						_clients.erase(badfd);
 						_fdToTransferId.erase(badfd);
-
-						// limpiar transfers relacionados (igual que antes)
-						cleanupTransfersForClient(badfd);
+						
+						cleanupTransfersForClient(badfd); // limpiar transfers relacionados (igual que antes)
 
 						// quitar entrada de _fds correspondiente al cliente (ya cerrada arriba)
 						_fds.erase(_fds.begin() + i);
@@ -696,9 +670,7 @@ int Server::runLoop()
 				if (_clients.find(fd) != _clients.end() && _clients[fd].outbuf.empty())
 					_fds[i].events &= ~POLLOUT; /*esta linea=Deja de vigilar escritura para este socket y la ~ es para invertir todos los bits de POLLOUT*/
 			}
-
-			// avanzar al siguiente fd
-			++i;
+			++i; // avanzar al siguiente fd
 		}
 	}
 	//Mensaje de que el servidor se ha cerrado con Ctr+c o Ctr+\ o kill

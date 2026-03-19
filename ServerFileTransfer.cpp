@@ -6,7 +6,7 @@
 /*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 14:14:47 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/18 17:25:40 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/19 14:31:58 by vdiez-cu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -217,7 +217,6 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 	{
 		char tmpbuf[4096];
 		ssize_t rn = recv(curFd, tmpbuf, sizeof(tmpbuf), 0);
-
 		if (rn > 0)
 		{
 			ft.lastActivity = std::time(NULL);
@@ -246,7 +245,6 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 					countBytes = true;
 				else
 					countBytes = false;
-
 				if (!flushBufferToFd(_fds, ft, *outbuf, dst, countBytes))
 					ft.closeAll();
 			}
@@ -268,7 +266,6 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 		}
 		else if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
 			ft.closeAll();
-
 		++i;
 		return (true);
 	}
@@ -293,7 +290,6 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 
 		if (outbuf->empty())
 			setPollEvents(_fds, curFd, POLLIN);
-
 		++i;
 		return (true);
 	}
@@ -319,6 +315,143 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 		return (true);
 	}
 	return (false);
+}
+
+bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std::vector<std::string> &toks, const std::string &prefix, const std::string &target, const std::string &filename, unsigned long fsize, unsigned long transferId)
+{
+	// Intentar conectar de forma activa al sender ORIGINAL (si el CTCP incluía IP y PORT). Muchos clientes (el emisor) están en modo "listen" y
+	// esperan que el receptor conecte a ellos. Si queremos recibir bytes en el proxy, debemos conectarnos al sender usando la IP/PORT que nos mandó.
+
+	// tratar de recuperar IP y PORT originales del sender si estaban en toks
+	if (toks.size() >= 3)
+	{
+		std::string orig_ip_tok = toks[1];
+		std::string orig_port_tok = toks[2];
+		// convertir IP: puede venir como decimal (host order) o dotted; soportamos ambos
+		struct sockaddr_in sender_addr;
+		std::memset(&sender_addr, 0, sizeof(sender_addr));
+		sender_addr.sin_family = AF_INET;
+		bool haveSenderAddr = false;
+
+		struct in_addr ina;
+		if (parseDccIpToken(orig_ip_tok, ina))
+		{
+			sender_addr.sin_addr = ina;
+			haveSenderAddr = true;
+		}
+
+		int sender_port = 0;
+		if (haveSenderAddr)
+		{
+			char *endptr_port = NULL;
+			sender_port = (int)strtol(orig_port_tok.c_str(), &endptr_port, 10);
+			if (*endptr_port != '\0' || sender_port <= 0 || sender_port > 65535)
+				haveSenderAddr = false;
+			else
+				sender_addr.sin_port = htons((uint16_t)sender_port);
+		}
+
+		if (haveSenderAddr)
+		{
+			// crear socket y conectarnos al sender (non-blocking)
+			int s = socket(AF_INET, SOCK_STREAM, 0);
+			if (s != -1)
+			{
+				fcntl(s, F_SETFL, O_NONBLOCK);
+
+				int cres = connect(s, (struct sockaddr*)&sender_addr, sizeof(sender_addr));
+				if (cres == 0) // conectado de inmediato
+				{
+					_transfers[transferId].senderFdRedDDC = s;
+					_transfers[transferId].senderClosed = false;
+
+					pollfd sp;
+					sp.fd = s;
+					sp.events = POLLIN;
+					sp.revents = 0;
+					_fds.push_back(sp);
+
+					_fdToTransferId[s] = transferId;
+				}
+				else if (errno == EINPROGRESS || errno == EINTR) // conexión en progreso: vigilamos POLLOUT para saber cuándo termina
+				{
+					_transfers[transferId].senderFdRedDDC = s;
+					_transfers[transferId].senderClosed = false;
+
+					pollfd sp;
+					sp.fd = s;
+					sp.events = POLLIN | POLLOUT;
+					sp.revents = 0;
+					_fds.push_back(sp);
+
+					_fdToTransferId[s] = transferId;
+				}
+				else
+					close(s);
+			}
+			else
+				sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy could not create outbound socket to sender; proxy will wait for connections");
+		}
+		else
+			sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy couldn't parse sender address from CTCP; proxy will wait for incoming connections");
+	}
+
+	// Obtener IP del servidor para enviar al receptor (si no se puede, usar 127.0.0.1)
+	// NOTA: no usar getsockname(_server_fd) cuando _server_fd está ligado a INADDR_ANY,
+	// porque devolvería 0.0.0.0. En su lugar intentamos averiguar la IP saliente
+	// creando un socket UDP y "conectándolo" a IP pública (no se envía tráfico).
+	std::string serverIp = "127.0.0.1";
+	int sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock != -1)
+	{
+		struct sockaddr_in remote;
+		std::memset(&remote, 0, sizeof(remote));
+		remote.sin_family = AF_INET;
+		// conectar a una IP pública solo para conocer la interfaz saliente
+		remote.sin_addr.s_addr = inet_addr("8.8.8.8");
+		remote.sin_port = htons(53);
+		// connect no envía paquetes en UDP, solo deja elegir interfaz
+		if (connect(sock, (struct sockaddr*)&remote, sizeof(remote)) != -1)
+		{
+			struct sockaddr_in name;
+			socklen_t namelen = sizeof(name);
+			if (getsockname(sock, (struct sockaddr*)&name, &namelen) != -1)
+			{
+				char ipbuf[INET_ADDRSTRLEN];
+				if (inet_ntop(AF_INET, &name.sin_addr, ipbuf, sizeof(ipbuf)) != NULL)
+					serverIp = ipbuf;
+			}
+		}
+		close(sock);
+	}
+
+	// Convertir IP (dotted) a entero decimal que usa DCC (ntohl(inet_addr(ip)))
+	uint32_t ip_net = inet_addr(serverIp.c_str()); // network order
+	uint32_t ip_decimal = ntohl(ip_net);          // host order decimal
+
+	// Construir el CTCP DCC SEND modificado para el receptor (le decimos que se conecte al servidor)
+	unsigned short port = _transfers[transferId].getListenerPort();
+	if (port == 0)
+	{
+		// fallback: puerto inválido
+		sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (listener port=0)");
+		return (true);
+	}
+
+	// Formato clásico DCC: IP en decimal (host order) y puerto en decimal.
+	std::string dccmsg = "\001DCC SEND " + filename + " " + intToString((int)ip_decimal) + " " + intToString((int)port) + " " + intToString((int)fsize) + "\001";
+	std::string outmsg = ":" + prefix + " PRIVMSG " + target + " :" + dccmsg;
+
+	// Enviar al receptor el CTCP con IP/puerto del proxy
+	sendNumeric(dst_fd, outmsg);
+
+	// Informar al emisor (opcional, mensaje NOTICE)
+	std::string senderNick = _clients[clientFd].nickname;
+	if (senderNick.empty())
+		senderNick = intToString(clientFd);
+	sendNumeric(clientFd, ":ircserv NOTICE " + senderNick + " :DCC proxy created id=" + intToString((int)transferId));
+
+	return (true);
 }
 
 bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string &text, const std::string &prefix, const std::string &target)
@@ -393,7 +526,7 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 			sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy failed to create listener");
 			std::string fallback = ":" + prefix + " PRIVMSG " + target + " :" + text;
 			sendNumeric(dst_fd, fallback);
-			return true;
+			return (true);
 		}
 
 		// Guardar la transferencia en el mapa del servidor (copiamos metadata).
@@ -410,7 +543,7 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 		{
 			// fallback seguro (no debería ocurrir si createListener() tuvo éxito)
 			sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (no listener fd)");
-			return true;
+			return (true);
 		}
 
 		// Añadir listener al array de poll para que runLoop() lo gestione
@@ -423,149 +556,7 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 		// Mapear el fd del listener a la transferencia
 		_fdToTransferId[lfd] = ft.id;
 
-		// Intentar conectar de forma activa al sender ORIGINAL (si el CTCP incluía IP y PORT). Muchos clientes (el emisor) están en modo "listen" y
-		// esperan que el receptor conecte a ellos. Si queremos recibir bytes en el proxy, debemos conectarnos al sender usando la IP/PORT que nos mandó.
-
-		// tratar de recuperar IP y PORT originales del sender si estaban en toks
-		if (toks.size() >= 3)
-		{
-			std::string orig_ip_tok = toks[1];
-			std::string orig_port_tok = toks[2];
-			// convertir IP: puede venir como decimal (host order) o dotted; soportamos ambos
-			struct sockaddr_in sender_addr;
-			std::memset(&sender_addr, 0, sizeof(sender_addr));
-			sender_addr.sin_family = AF_INET;
-			bool haveSenderAddr = false;
-
-			struct in_addr ina;
-			if (parseDccIpToken(orig_ip_tok, ina))
-			{
-				sender_addr.sin_addr = ina;
-				haveSenderAddr = true;
-			}
-
-			int sender_port = 0;
-			if (haveSenderAddr)
-			{
-				char *endptr_port = NULL;
-				sender_port = (int)strtol(orig_port_tok.c_str(), &endptr_port, 10);
-				if (*endptr_port != '\0' || sender_port <= 0 || sender_port > 65535)
-					haveSenderAddr = false;
-				else
-					sender_addr.sin_port = htons((uint16_t)sender_port);
-			}
-
-			if (haveSenderAddr)
-			{
-				// crear socket y conectarnos al sender (non-blocking)
-				int s = socket(AF_INET, SOCK_STREAM, 0);
-				if (s != -1)
-				{
-					// poner non-blocking
-					// int fl = fcntl(s, F_GETFL, 0);
-					// if (fl != -1)
-					// 	fcntl(s, F_SETFL, fl | O_NONBLOCK);
-					fcntl(s, F_SETFL, O_NONBLOCK);
-
-					int cres = connect(s, (struct sockaddr*)&sender_addr, sizeof(sender_addr));
-					if (cres == 0)
-					{
-						// conectado de inmediato
-						_transfers[ft.id].senderFdRedDDC = s;
-						_transfers[ft.id].senderClosed = false;
-
-						pollfd sp;
-						sp.fd = s;
-						sp.events = POLLIN;
-						sp.revents = 0;
-						_fds.push_back(sp);
-
-						_fdToTransferId[s] = ft.id;
-					}
-					else if (errno == EINPROGRESS || errno == EINTR)
-					{
-						// conexión en progreso: vigilamos POLLOUT para saber cuándo termina
-						_transfers[ft.id].senderFdRedDDC = s;
-						_transfers[ft.id].senderClosed = false;
-
-						pollfd sp;
-						sp.fd = s;
-						sp.events = POLLIN | POLLOUT;
-						sp.revents = 0;
-						_fds.push_back(sp);
-
-						_fdToTransferId[s] = ft.id;
-
-					}
-					else
-						close(s);
-				}
-				else
-					sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy could not create outbound socket to sender; proxy will wait for connections");
-			}
-			else
-				sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy couldn't parse sender address from CTCP; proxy will wait for incoming connections");
-		}
-
-		// Obtener IP del servidor para enviar al receptor (si no se puede, usar 127.0.0.1)
-		// NOTA: no usar getsockname(_server_fd) cuando _server_fd está ligado a INADDR_ANY,
-		// porque devolvería 0.0.0.0. En su lugar intentamos averiguar la IP saliente
-		// creando un socket UDP y "conectándolo" a IP pública (no se envía tráfico).
-		std::string serverIp = "127.0.0.1";
-		{
-			int sock = socket(AF_INET, SOCK_DGRAM, 0);
-			if (sock != -1)
-			{
-				struct sockaddr_in remote;
-				std::memset(&remote, 0, sizeof(remote));
-				remote.sin_family = AF_INET;
-				// conectar a una IP pública solo para conocer la interfaz saliente
-				remote.sin_addr.s_addr = inet_addr("8.8.8.8");
-				remote.sin_port = htons(53);
-				// connect no envía paquetes en UDP, solo deja elegir interfaz
-				if (connect(sock, (struct sockaddr*)&remote, sizeof(remote)) != -1)
-				{
-					struct sockaddr_in name;
-					socklen_t namelen = sizeof(name);
-					if (getsockname(sock, (struct sockaddr*)&name, &namelen) != -1)
-					{
-						char ipbuf[INET_ADDRSTRLEN];
-						if (inet_ntop(AF_INET, &name.sin_addr, ipbuf, sizeof(ipbuf)) != NULL)
-							serverIp = ipbuf;
-					}
-				}
-				close(sock);
-			}
-		}
-
-		// Convertir IP (dotted) a entero decimal que usa DCC (ntohl(inet_addr(ip)))
-		uint32_t ip_net = inet_addr(serverIp.c_str()); // network order
-		uint32_t ip_decimal = ntohl(ip_net);          // host order decimal
-
-		// Construir el CTCP DCC SEND modificado para el receptor (le decimos que se conecte al servidor)
-		unsigned short port = _transfers[ft.id].getListenerPort();
-		if (port == 0)
-		{
-			// fallback: puerto inválido
-			sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (listener port=0)");
-			return true;
-		}
-
-		// Formato clásico DCC: IP en decimal (host order) y puerto en decimal.
-		std::string dccmsg = "\001DCC SEND " + filename + " " + intToString((int)ip_decimal) + " " + intToString((int)port) + " " + intToString((int)fsize) + "\001";
-		std::string outmsg = ":" + prefix + " PRIVMSG " + target + " :" + dccmsg;
-
-		// Enviar al receptor el CTCP con IP/puerto del proxy
-		sendNumeric(dst_fd, outmsg);
-
-		// Informar al emisor (opcional, mensaje NOTICE)
-		std::string senderNick = _clients[clientFd].nickname;
-		if (senderNick.empty())
-			senderNick = intToString(clientFd);
-		sendNumeric(clientFd, ":ircserv NOTICE " + senderNick + " :DCC proxy created id=" + intToString((int)ft.id));
-
-		// Fin: no reenviamos el PRIVMSG original (interceptado)
-		return (true);
+		return (handleDccSendInPrivmsgDccProxy(clientFd, dst_fd, toks, prefix, target, filename, fsize, ft.id));
 	}
 
 	// Si no había tokens (no filename) -> no hicimos nada especial
