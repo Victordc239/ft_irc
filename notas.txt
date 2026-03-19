@@ -5,3 +5,9 @@
 - Comprobar el uso de funciones prohibidas
 - Cambiar el nombre de las funciones, las variables y los archivos (nombres descriptivos)
 - Comprobar hoja de correcciones : https://www.42evalhub.com/common/ftirc
+
+
+
+https://es.wikipedia.org/wiki/Internet_Relay_Chat
+
+https://irssi.org/documentation/manual/
