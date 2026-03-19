@@ -34,6 +34,8 @@ Additionally, the `bonus part` of the project has been implemented to extend the
 - Server handles multiple clients simultaneously.  
 
 ## Features
+
+### Mandatory Part
 - Multi-channel support with unique channel names  
 - Public messages broadcasted to all clients in a channel  
 - Private messaging between individual clients  
@@ -43,7 +45,11 @@ Additionally, the `bonus part` of the project has been implemented to extend the
 - Command parsing following IRC standards
 - Support for core IRC commands (NICK, USER, JOIN, PRIVMSG, KICK, INVITE, TOPIC, MODE, PART, PASS, CAP, PING, PONG, QUIT, DCC SEND, DCC GET)
 
-## Our IRC Commands
+### Bonus Part
+- File transfer between clients using DCC (DCC SEND / DCC GET)  
+- IRC bot implementation for automated responses  
+
+## Supported IRC Commands
 - `NICK`: NICK command is used to give user a nickname or change the existing one.
 - `USER`: The USER command is used at the beginning of connection to specify the username, hostname and realname of a new user.
 - `JOIN`: The JOIN command is used by a user to request to start listening to the specific channel.
@@ -92,6 +98,7 @@ To start the Server, use:
 
 ### Connecting to the Server
 To connect to the server, you can use:
+
 Using netcat:
 ```bash
 nc <IP ADDRESS> <PORT>
@@ -105,6 +112,7 @@ irssi -c <IP_ADDRESS> -p <PORT>
 You can also use the Irssi IRC client.
 
 ### Initial Authentication (IRC protocol)
+
 ```
 PASS <password>
 NICK your_nickname
@@ -113,9 +121,11 @@ USER your_username
 
 ## Resources
 - https://www.rfc-editor.org/rfc/rfc1459.html
+- https://es.wikipedia.org/wiki/Internet_Relay_Chat
+- https://irssi.org/documentation/manual/
 
 ### AI Assistance
-Artificial Intelligence was used for:
+Artificial Intelligence tools were used for:
 - Structuring and writing the README file.
 - Clarifying IRC protocol behavior and command usage.
 - Providing guidance on best practices for socket programming and project organization.
