@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerFileTransfer.cpp                             :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 14:14:47 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/19 14:31:58 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/19 17:13:30 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -501,7 +501,7 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 		if (toks.size() >= 4)
 		{
 			char *endptr = NULL;
-			fsize = (unsigned long)ftStrtol(toks[3].c_str(), &endptr);
+			fsize = (unsigned long)ft_strtol(toks[3].c_str(), &endptr);
 			if (*endptr != '\0')
 				fsize = 0; // parse error -> 0
 		}
@@ -546,7 +546,7 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 			return (true);
 		}
 
-		// Añadir listener al array de poll para que runLoop() lo gestione
+		// Añadir listener al array de poll para que runServerLoop() lo gestione
 		pollfd pfd;
 		pfd.fd = lfd;
 		pfd.events = POLLIN;
@@ -556,7 +556,8 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 		// Mapear el fd del listener a la transferencia
 		_fdToTransferId[lfd] = ft.id;
 
-		return (handleDccSendInPrivmsgDccProxy(clientFd, dst_fd, toks, prefix, target, filename, fsize, ft.id));
+		bool result = handleDccSendInPrivmsgDccProxy(clientFd, dst_fd, toks, prefix, target, filename, fsize, ft.id);
+		return (result);
 	}
 
 	// Si no había tokens (no filename) -> no hicimos nada especial
@@ -564,7 +565,7 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 }
 
 //  Limpia todas las transfers que referencien al cliente badfd.
-//    Esta lógica estaba duplicada varias veces en runLoop; la centralizamos aquí.
+//    Esta lógica estaba duplicada varias veces en runServerLoop; la centralizamos aquí.
 //    NOTA: conserva exactamente los mismos pasos que antes: closeAll(), borrar mappings,
 //    borrar fds del vector _fds, y eliminar las entradas de _transfers.
 void Server::cleanupTransfersForClient(int badfd)

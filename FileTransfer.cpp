@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   FileTransfer.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/18 17:31:55 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/19 16:46:42 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -82,7 +82,7 @@ FileTransfer &FileTransfer::operator=(const FileTransfer &other)
 		startedAt = other.startedAt;
 		lastActivity = other.lastActivity;
 	}
-	return *this;
+	return (*this);
 }
 
 FileTransfer::~FileTransfer()
@@ -168,7 +168,7 @@ unsigned short FileTransfer::getListenerPort() const
 	if (getsockname(socketFileTransfer, (sockaddr *)&addr, &len) == -1)
 		return (0);
 
-	return (ntohs(addr.sin_port));
+	return (ntohs(addr.sin_port)); //ntohs devuelve el puerto que usa el cliente cuando se conecta al servidor
 }
 
 // Cerrar todos los sockets propietarios de la transferencia

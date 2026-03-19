@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/19 14:45:52 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/19 17:13:30 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -86,15 +86,15 @@ class Server
 		Server &operator=(const Server &other);
 		~Server();
 
-		bool	initAndListen(long port, const std::string &password);
+		bool	InitSocketAndListen(long port, const std::string &password);
 		int	setNonblock(int fd);
 		bool	handleClientReadEvent(size_t i);
-		int	runLoop();
+		int	runServerLoop();
 
 };
 
 std::string	intToString(int n);
-long		ftStrtol(const char *str, char **endptr);
+long		ft_strtol(const char *str, char **endptr);
 bool		parseDccIpToken(const std::string &tok, struct in_addr &out);
 
 

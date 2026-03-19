@@ -2,7 +2,7 @@
 
 # ft_irc
 
-## Description 
+## 📝 Description 
 `ft_irc` is a C++ project that implements a fully functional IRC server following the IRC (Internet Relay Chat) protocol.  
 
 This project allows multiple clients to connect to the server, join channels, send private and public messages, and interact in real time, effectively simulating the behavior of a real IRC server. The server is built using TCP sockets and handles multiple clients using I/O multiplexing.
@@ -19,7 +19,7 @@ Additionally, the `bonus part` of the project has been implemented to extend the
 - File transfer management between clients.  
 - Implementation of a bot to automate interactions and responses. 
 
-## Architecture Overview
+## 🌐 Architecture Overview
 ```
 +----------------+        TCP        +----------------+
 |  IRC Client 1  | <--------------> |                |
@@ -33,7 +33,7 @@ Additionally, the `bonus part` of the project has been implemented to extend the
 - Each client connects via TCP sockets and can send commands/messages.  
 - Server handles multiple clients simultaneously.  
 
-## Features
+## 💡 Features
 
 ### Mandatory Part
 - Multi-channel support with unique channel names  
@@ -49,7 +49,7 @@ Additionally, the `bonus part` of the project has been implemented to extend the
 - File transfer between clients using DCC (DCC SEND / DCC GET)  
 - IRC bot implementation for automated responses  
 
-## Supported IRC Commands
+## 🖥️ Supported IRC Commands
 - `NICK`: NICK command is used to give user a nickname or change the existing one.
 - `USER`: The USER command is used at the beginning of connection to specify the username, hostname and realname of a new user.
 - `JOIN`: The JOIN command is used by a user to request to start listening to the specific channel.
@@ -67,7 +67,7 @@ Additionally, the `bonus part` of the project has been implemented to extend the
 - `DCC SEND`: The DCC SEND command is used to send a file to another user.
 - `DCC GET`: The DCC GET command is used to receive a file from another user.
 
-## Instructions
+## ⚙️ Instructions
 
 ### Requirements
 - C++ compiler supporting C++98
@@ -119,7 +119,7 @@ NICK your_nickname
 USER your_username
 ```
 
-## Resources
+## 🧑🏻‍💻👩🏼‍💻👨🏽‍💻 Resources
 - https://www.rfc-editor.org/rfc/rfc1459.html
 - https://es.wikipedia.org/wiki/Internet_Relay_Chat
 - https://irssi.org/documentation/manual/

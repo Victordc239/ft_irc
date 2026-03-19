@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/19 14:59:11 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/19 17:13:30 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -265,7 +265,7 @@ int Server::setNonblock(int fd)
 	return (0);
 }
 
-bool Server::initAndListen(long port, const std::string &password)
+bool Server::InitSocketAndListen(long port, const std::string &password)
 {
 	_serverPassword = password;
 
@@ -539,7 +539,7 @@ bool Server::handleClientReadEvent(size_t i)
 	return (false);
 }
 
-int Server::runLoop()
+int Server::runServerLoop()
 {
 	while (g_running)
 	{
@@ -617,7 +617,7 @@ int Server::runLoop()
 
 					char client_ip[INET_ADDRSTRLEN]; //tamaño máximo para almacenar la representación en texto de una dirección IPv4
 					if (inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip)) == NULL)
-						std::cout << "Cliente conectado (fd " << client_fd << ") desde [ip desconocida]:" << ntohs(client_addr.sin_port) << "!\n";
+						std::cout << "Cliente conectado (fd " << client_fd << ") desde [ip desconocida]:" << ntohs(client_addr.sin_port) << "!\n"; 
 					else
 						std::cout << "Cliente conectado desde " << client_ip << ":" << ntohs(client_addr.sin_port) << " (fd " << client_fd << ")\n";
 				}

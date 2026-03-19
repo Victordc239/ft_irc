@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommandsModeFlags.cpp                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 14:47:22 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/18 14:18:58 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/19 16:58:25 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -163,7 +163,7 @@ void Server::mode_l(int clientFd, Channel &channel, const std::string &channelNa
 		// param debería ser número
 		const char *s = param.c_str();
 		char *endptr = NULL;
-		long v = ftStrtol(s, &endptr);
+		long v = ft_strtol(s, &endptr);
 		if (*endptr != '\0' || v < 0)
 		{
 			sendNumeric(clientFd, "461 MODE :Not enough parameters");

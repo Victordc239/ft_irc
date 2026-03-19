@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerUtils.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 16:21:40 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/16 17:12:12 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/19 16:58:25 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,7 +29,7 @@ std::string intToString(int n)
 	return (result);
 }
 
-long ftStrtol(const char *str, char **endptr)
+long ft_strtol(const char *str, char **endptr)
 {
 	if (!str)
 	{
