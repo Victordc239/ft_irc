@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   FileTransfer.hpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:24 by victor            #+#    #+#             */
-/*   Updated: 2026/03/16 17:00:10 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/23 14:45:31 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -66,7 +66,7 @@ class FileTransfer
 		bool isActive() const;
 
 	private:
-		int setNonBlocking(int fd);
+		int setNonBlockinging(int fd);
 };
 
 #endif

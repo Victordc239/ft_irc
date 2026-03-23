@@ -119,7 +119,7 @@ NICK your_nickname
 USER your_username
 ```
 
-## 🧑🏻‍💻👩🏼‍💻👨🏽‍💻 Resources
+## 🔍 Resources
 - https://www.rfc-editor.org/rfc/rfc1459.html
 - https://es.wikipedia.org/wiki/Internet_Relay_Chat
 - https://irssi.org/documentation/manual/

@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/19 16:46:42 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 14:45:31 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -90,7 +90,7 @@ FileTransfer::~FileTransfer()
 	closeAll();
 }
 
-int FileTransfer::setNonBlocking(int fd)
+int FileTransfer::setNonBlockinging(int fd)
 {
 	// int flags = fcntl(fd, F_GETFL, 0);
 	// if (flags == -1)
@@ -122,7 +122,7 @@ int FileTransfer::createListener()
 	// socketFileTransfer=socket, SOL_SOCKET=aplica a todo el socket(no solo al puerto o ip o protocolo),
 	// SO_REUSEADDR=permite reusar ip y puerto, &opt=activarlo, sizeof(opt)=tamaño valor
 
-	if (setNonBlocking(socketFileTransfer) == -1)
+	if (setNonBlockinging(socketFileTransfer) == -1)
 	{
 		close(socketFileTransfer);
 		socketFileTransfer = -1;

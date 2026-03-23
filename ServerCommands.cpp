@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/19 15:00:32 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/23 14:40:51 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,7 +30,7 @@ bool Server::handleInitialAuthentication(size_t &i, const std::string &line)
 		}
 		else
 		{
-			sendNumeric(clientFd, "464 :Password incorrect");
+			sendNumericMessage(clientFd, "464 :Password incorrect");
 			std::cout << "fd " << clientFd << " PASS incorrecto\n";
 		}
 	}
@@ -61,7 +61,7 @@ bool Server::handleInitialAuthentication(size_t &i, const std::string &line)
 
 		if (subcmd == "LS")
 		{
-			sendNumeric(clientFd, "CAP * LS :"); // Respondemos exactamente como hace irssi por defecto cuando pedimos LS:
+			sendNumericMessage(clientFd, "CAP * LS :"); // Respondemos exactamente como hace irssi por defecto cuando pedimos LS:
 			std::cout << "fd " << clientFd << " CAP LS recibido (ignorando)\n";
 		}
 		else if (subcmd == "END")
@@ -102,11 +102,11 @@ void Server::handleNickCommand(int clientFd, const std::string &line)
 	if (newnick.empty())
 	{
 		// ERR_NONICKNAMEGIVEN 431 (sin prefijo de servidor para simplificar)
-		sendNumeric(clientFd, "431 :No nickname given");
+		sendNumericMessage(clientFd, "431 :No nickname given");
 		return;
 	}
 
-	if (nickInUse(newnick))
+	if (isNickInUse(newnick))
 	{
 		// ERR_NICKNAMEINUSE 433
 		//    Formato recomendado: :<servername> 433 <yournick-or-*> <attemptednick> :Nickname is already in use
@@ -115,7 +115,7 @@ void Server::handleNickCommand(int clientFd, const std::string &line)
 		if (current.empty())
 			current = "*";
 		std::string err = ":ircserv 433 " + current + " " + newnick + " :Nickname is already in use";
-		sendNumeric(clientFd, err);
+		sendNumericMessage(clientFd, err);
 		return;
 	}
 
@@ -158,7 +158,7 @@ void Server::handleUserCommand(int clientFd, const std::string &line)
 		std::cout << "fd " << clientFd << " set USER=" << user << " REAL=" << realname << "\n";
 	}
 	else
-		sendNumeric(clientFd, "461 USER :Not enough parameters"); 	// ERR_NEEDMOREPARAMS 461 (usar sendNumeric en vez de send directo)
+		sendNumericMessage(clientFd, "461 USER :Not enough parameters"); 	// ERR_NEEDMOREPARAMS 461 (usar sendNumericMessage en vez de send directo)
 }
 
 void Server::handleJoinCommand(int clientFd, const std::string &line)
@@ -177,7 +177,7 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 	// Si no hay parámetros, devolvemos error estándar
 	if (rest.empty())
 	{
-		sendNumeric(clientFd, "461 JOIN :Not enough parameters");
+		sendNumericMessage(clientFd, "461 JOIN :Not enough parameters");
 		return;
 	}
 
@@ -210,14 +210,14 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 	// Validación mínima: nombre de canal no vacío
 	if (nameChannel.empty())
 	{
-		sendNumeric(clientFd, "461 JOIN :Not enough parameters");
+		sendNumericMessage(clientFd, "461 JOIN :Not enough parameters");
 		return;
 	}
 
 	// VALIDACIÓN DEL NOMBRE DEL CANAL: prefijo válido (# & + !)
 	if (nameChannel[0] != '#' && nameChannel[0] != '&' && nameChannel[0] != '+' && nameChannel[0] != '!')
 	{
-		sendNumeric(clientFd, "403 " + nameChannel + " :Invalid channel prefix");
+		sendNumericMessage(clientFd, "403 " + nameChannel + " :Invalid channel prefix");
 		return;
 	}
 
@@ -245,7 +245,7 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		std::string nick = _clients[clientFd].nickname;
 		if (nick.empty())
 			nick = intToString(clientFd);
-		sendNumeric(clientFd, "473 " + nick + " " + nameChannel + " :Cannot join channel (+i)");
+		sendNumericMessage(clientFd, "473 " + nick + " " + nameChannel + " :Cannot join channel (+i)");
 		return;
 	}
 
@@ -258,7 +258,7 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 			std::string nick = _clients[clientFd].nickname;
 			if (nick.empty())
 				nick = intToString(clientFd);
-			sendNumeric(clientFd, "475 " + nick + " " + nameChannel + " :Cannot join channel (+k)");
+			sendNumericMessage(clientFd, "475 " + nick + " " + nameChannel + " :Cannot join channel (+k)");
 			return;
 		}
 	}
@@ -269,7 +269,7 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		std::string nick = _clients[clientFd].nickname;
 		if (nick.empty())
 			nick = intToString(clientFd);
-		sendNumeric(clientFd, "471 " + nick + " " + nameChannel + " :Cannot join channel (+l)");
+		sendNumericMessage(clientFd, "471 " + nick + " " + nameChannel + " :Cannot join channel (+l)");
 		return;
 	}
 
@@ -320,7 +320,7 @@ void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
 			continue;
 		}
 
-		sendNumeric(fd, joinmsg);
+		sendNumericMessage(fd, joinmsg);
 		++iteratorMessageJoin;
 	}
 
@@ -329,25 +329,25 @@ void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
 	std::string modes = "";
 	std::string params = "";
 	if (channel.isInviteOnly())
-		modes += "i";
+		modes = modes + "i";
 	if (channel.isTopicRestricted())
-		modes += "t";
+		modes = modes + "t";
 	if (channel.hasKey())
 	{
-		modes += "k";
-		params += " " + channel.getKey();
+		modes = modes + "k";
+		params = params + " " + channel.getKey();
 	}
 	if (channel.getLimit() > 0)
 	{
-		modes += "l";
-		params += " " + intToString(channel.getLimit());
+		modes = modes + "l";
+		params = params + " " + intToString(channel.getLimit());
 	}
 
 	if (!modes.empty())
 	{
 		// Formato: :server 324 <nick> <channel> <modes> [params]
 		std::string reply = ":ircserv 324 " + nick + " " + nameChannel + " +" + modes + params;
-		sendNumeric(clientFd, reply);
+		sendNumericMessage(clientFd, reply);
 	}
 
 	// Enviar TOPIC (332) o NOTOPIC (331)
@@ -357,12 +357,12 @@ void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
 	// si no existe, sustituye por la forma correcta de obtener el topic.
 	topic = channel.getTopic();
 	if (!topic.empty())
-		sendNumeric(clientFd, ":ircserv 332 " + nick + " " + nameChannel + " :" + topic); // RPL_TOPIC 332 <nick> <channel> :<topic>
+		sendNumericMessage(clientFd, ":ircserv 332 " + nick + " " + nameChannel + " :" + topic); // RPL_TOPIC 332 <nick> <channel> :<topic>
 	else
-		sendNumeric(clientFd, ":ircserv 331 " + nick + " " + nameChannel + " :No topic is set"); // RPL_NOTOPIC 331 <nick> <channel> :No topic is set
+		sendNumericMessage(clientFd, ":ircserv 331 " + nick + " " + nameChannel + " :No topic is set"); // RPL_NOTOPIC 331 <nick> <channel> :No topic is set
 
 	// Enviar lista de usuarios del canal al cliente que entra (NAMES - 353)
-	// Construimos la línea completa de NAMES y la enviamos en un solo sendNumeric
+	// Construimos la línea completa de NAMES y la enviamos en un solo sendNumericMessage
 	// (si lo prefieres puedes enviar en múltiples paquetes, pero aquí respetamos
 	// la forma en que lo tenías originalmente).
 	std::string names = ":ircserv 353 " + nick + " = " + nameChannel + " :";
@@ -384,16 +384,16 @@ void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
 			entryNick = _clients[fd].nickname;
 
 		if (channel.isOperator(fd))
-			names += "@" + entryNick + " ";
+			names = names + "@" + entryNick + " ";
 		else
-			names += entryNick + " ";
+			names = names + entryNick + " ";
 
 		++iteratorCreateList;
 	}
 
 	// Enviamos la lista y el marcador de fin de lista.
-	sendNumeric(clientFd, names);
-	sendNumeric(clientFd, ":ircserv 366 " + nick + " " + nameChannel + " :End of /NAMES list");
+	sendNumericMessage(clientFd, names);
+	sendNumericMessage(clientFd, ":ircserv 366 " + nick + " " + nameChannel + " :End of /NAMES list");
 
 	// Mensaje por consola para depuración / logs
 	std::cout << "JOIN: cliente fd " << clientFd << " unido a " << nameChannel << "\n";
@@ -405,7 +405,7 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 	const size_t prefix_len = 5;
 	if (line.size() <= prefix_len)
 	{
-		sendNumeric(clientFd, "461 PART :Not enough parameters");
+		sendNumericMessage(clientFd, "461 PART :Not enough parameters");
 		return;
 	}
 
@@ -451,7 +451,7 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 
 	if (channelName.empty())
 	{
-		sendNumeric(clientFd, "461 PART :Not enough parameters");
+		sendNumericMessage(clientFd, "461 PART :Not enough parameters");
 		return;
 	}
 
@@ -459,7 +459,7 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
 	if (it == _channels.end())
 	{
-		sendNumeric(clientFd, "403 " + channelName + " :No such channel");
+		sendNumericMessage(clientFd, "403 " + channelName + " :No such channel");
 		return;
 	}
 	Channel &channel = it->second;
@@ -467,7 +467,7 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 	// Comprueba que el emisor esté en el canal
 	if (!channel.hasClient(clientFd))
 	{
-		sendNumeric(clientFd, "442 " + channelName + " :You're not on that channel");
+		sendNumericMessage(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
 
@@ -483,9 +483,9 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 	// Construir mensaje PART
 	std::string out = ":" + prefix + " PART " + channelName;
 	if (!reason.empty())
-		out += " :" + reason;
+		out = out + " :" + reason;
 	else
-		out += " :";
+		out = out + " :";
 
 	// Enviar PART a todos los miembros del canal (incluyendo el que sale)
 	std::set<int>::iterator sit = channel.clients.begin();
@@ -493,7 +493,7 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 	{
 		int fd = *sit;
 		if (_clients.find(fd) != _clients.end())
-			sendNumeric(fd, out);
+			sendNumericMessage(fd, out);
 		++sit;
 	}
 
@@ -511,7 +511,7 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 	const size_t prefix_len = 8; // strlen("PRIVMSG ")
 	if (line.size() <= prefix_len)
 	{
-		sendNumeric(clientFd, "461 PRIVMSG :Not enough parameters");
+		sendNumericMessage(clientFd, "461 PRIVMSG :Not enough parameters");
 		return;
 	}
 
@@ -519,7 +519,7 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 	size_t space = line.find(' ', prefix_len);
 	if (space == std::string::npos)
 	{
-		sendNumeric(clientFd, "461 PRIVMSG :Not enough parameters");
+		sendNumericMessage(clientFd, "461 PRIVMSG :Not enough parameters");
 		return;
 	}
 
@@ -549,7 +549,7 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 
 		if (text.empty())
 		{
-			sendNumeric(clientFd, "412 :No text to send");
+			sendNumericMessage(clientFd, "412 :No text to send");
 			return;
 		}
 	}
@@ -558,7 +558,7 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 		text = line.substr(colon + 1);
 		if (text.empty())
 		{
-			sendNumeric(clientFd, "412 :No text to send");
+			sendNumericMessage(clientFd, "412 :No text to send");
 			return;
 		}
 		// quitar posible CR al final
@@ -599,7 +599,7 @@ void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, 
 				":" + _bot.getName() + "!bot@localhost PRIVMSG " +
 				nick + " :" + botReply;
 
-			sendNumeric(clientFd, botOut);
+			sendNumericMessage(clientFd, botOut);
 		}
 		return;
 	}
@@ -610,7 +610,7 @@ void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, 
 		std::map<std::string, Channel>::iterator channelIterator = _channels.find(target);
 		if (channelIterator == _channels.end())
 		{
-			sendNumeric(clientFd, "403 " + target + " :No such channel");
+			sendNumericMessage(clientFd, "403 " + target + " :No such channel");
 			return;
 		}
 
@@ -618,7 +618,7 @@ void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, 
 
 		if (!channel.hasClient(clientFd))
 		{
-			sendNumeric(clientFd, "442 " + target + " :You're not on that channel");
+			sendNumericMessage(clientFd, "442 " + target + " :You're not on that channel");
 			return;
 		}
 
@@ -632,7 +632,7 @@ void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, 
 			{
 				int fd = *itb;
 				if (_clients.find(fd) != _clients.end())
-					sendNumeric(fd, botOut);
+					sendNumericMessage(fd, botOut);
 				++itb;
 			}
 		}
@@ -654,7 +654,7 @@ void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, 
 				++it;
 				continue;
 			}
-			sendNumeric(fd, out);
+			sendNumericMessage(fd, out);
 			++it;
 		}
 		return;
@@ -662,10 +662,10 @@ void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, 
 
 	// Si target es usuario -> comprobar DCC (CTCP dentro del PRIVMSG)
 	// Nota: /dcc send del cliente se traduce en un PRIVMSG con CTCP: PRIVMSG nick :\001DCC SEND <file> <ip> <port> <size>\001
-	int dst_fd = getFdByNick(target);
+	int dst_fd = findFdByNick(target);
 	if (dst_fd == -1)
 	{
-		sendNumeric(clientFd, "401 " + target + " :No such nick");
+		sendNumericMessage(clientFd, "401 " + target + " :No such nick");
 		return;
 	}
 
@@ -689,9 +689,9 @@ void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, 
 	if (!botReply.empty() && !isCTCP)
 	{
 		std::string botOut = ":" + _bot.getName() + "!bot@localhost PRIVMSG " + target + " :" + botReply;
-		sendNumeric(dst_fd, botOut);
+		sendNumericMessage(dst_fd, botOut);
 	}
 
 	std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
-	sendNumeric(dst_fd, out);
+	sendNumericMessage(dst_fd, out);
 }

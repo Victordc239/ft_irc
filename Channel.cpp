@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:57 by victor            #+#    #+#             */
-/*   Updated: 2026/03/19 16:41:58 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 15:02:00 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -126,11 +126,6 @@ bool Channel::hasTopic() const
 const std::string &Channel::getTopic() const
 {
 	return (topic);
-}
-
-const std::string &Channel::getTopicSetter() const
-{
-	return (topic_set_by);
 }
 
 time_t Channel::getTopicTime() const

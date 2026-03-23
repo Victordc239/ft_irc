@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/19 17:13:30 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 14:59:56 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -49,9 +49,9 @@ class Server
 		std::map<int, unsigned long> _fdToTransferId; // fd -> transfer id
 		Bot _bot;
 
-		bool	nickInUse(const std::string &nick) const;
-		void	sendNumeric(int fd, const std::string &msg);
-		int	getFdByNick(const std::string &nick) const;
+		bool	isNickInUse(const std::string &nick) const;
+		void	sendNumericMessage(int fd, const std::string &msg);
+		int		findFdByNick(const std::string &nick) const;
 		bool	handleInitialAuthentication(size_t &i, const std::string &line);
 		void	handleNickCommand(int clientFd, const std::string &line);
 		void	handleUserCommand(int clientFd, const std::string &line);
@@ -87,8 +87,8 @@ class Server
 		~Server();
 
 		bool	InitSocketAndListen(long port, const std::string &password);
-		int	setNonblock(int fd);
-		bool	handleClientReadEvent(size_t i);
+		int	setNonBlocking(int fd);
+		bool	handleClientEvent(size_t i);
 		int	runServerLoop();
 
 };

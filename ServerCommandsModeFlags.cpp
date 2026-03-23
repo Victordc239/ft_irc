@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 14:47:22 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/19 16:58:25 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 14:42:21 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,7 +17,7 @@ void Server::mode_i(int clientFd, Channel &channel, const std::string &channelNa
 	// solo operadores pueden cambiar opciones del canal
 	if (!channel.isOperator(clientFd))
 	{
-		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
+		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
 
@@ -25,16 +25,16 @@ void Server::mode_i(int clientFd, Channel &channel, const std::string &channelNa
 
 	std::string out = ":" + prefix + " MODE " + channelName + " ";
 	if (plus)
-		out += "+i";
+		out = out + "+i";
 	else
-		out += "-i";
+		out = out + "-i";
 
 	std::set<int>::iterator iterator = channel.clients.begin();
 	while (iterator != channel.clients.end())
 	{
 		int fd = *iterator;
 		if (_clients.find(fd) != _clients.end())
-			sendNumeric(fd, out);
+			sendNumericMessage(fd, out);
 		++iterator;
 	}
 }
@@ -43,7 +43,7 @@ void Server::mode_t(int clientFd, Channel &channel, const std::string &channelNa
 {
 	if (!channel.isOperator(clientFd))
 	{
-		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
+		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
 
@@ -51,16 +51,16 @@ void Server::mode_t(int clientFd, Channel &channel, const std::string &channelNa
 
 	std::string out = ":" + prefix + " MODE " + channelName + " ";
 	if (plus)
-		out += "+t";
+		out = out + "+t";
 	else
-		out += "-t";
+		out = out + "-t";
 
 	std::set<int>::iterator iterator = channel.clients.begin();
 	while (iterator != channel.clients.end())
 	{
 		int fd = *iterator;
 		if (_clients.find(fd) != _clients.end())
-			sendNumeric(fd, out);
+			sendNumericMessage(fd, out);
 		++iterator;
 	}
 }
@@ -69,7 +69,7 @@ void Server::mode_k(int clientFd, Channel &channel, const std::string &channelNa
 {
 	if (!channel.isOperator(clientFd))
 	{
-		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
+		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
 
@@ -84,7 +84,7 @@ void Server::mode_k(int clientFd, Channel &channel, const std::string &channelNa
 		{
 			int fd = *iterator;
 			if (_clients.find(fd) != _clients.end())
-				sendNumeric(fd, out);
+				sendNumericMessage(fd, out);
 			++iterator;
 		}
 	}
@@ -99,7 +99,7 @@ void Server::mode_k(int clientFd, Channel &channel, const std::string &channelNa
 		{
 			int fd = *iterator;
 			if (_clients.find(fd) != _clients.end())
-				sendNumeric(fd, out);
+				sendNumericMessage(fd, out);
 			++iterator;
 		}
 	}
@@ -110,20 +110,20 @@ void Server::mode_o(int clientFd, Channel &channel, const std::string &channelNa
 	// sólo operadores pueden dar/quitar operador
 	if (!channel.isOperator(clientFd))
 	{
-		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
+		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
 
-	int targetFd = getFdByNick(targetNick);
+	int targetFd = findFdByNick(targetNick);
 	if (targetFd == -1)
 	{
-		sendNumeric(clientFd, "401 " + targetNick + " :No such nick");
+		sendNumericMessage(clientFd, "401 " + targetNick + " :No such nick");
 		return;
 	}
 
 	if (!channel.hasClient(targetFd))
 	{
-		sendNumeric(clientFd, "441 " + targetNick + " " + channelName + " :They aren't on that channel");
+		sendNumericMessage(clientFd, "441 " + targetNick + " " + channelName + " :They aren't on that channel");
 		return;
 	}
 
@@ -145,7 +145,7 @@ void Server::mode_o(int clientFd, Channel &channel, const std::string &channelNa
 	{
 		int fd = *iterator;
 		if (_clients.find(fd) != _clients.end())
-			sendNumeric(fd, out);
+			sendNumericMessage(fd, out);
 		++iterator;
 	}
 }
@@ -154,7 +154,7 @@ void Server::mode_l(int clientFd, Channel &channel, const std::string &channelNa
 {
 	if (!channel.isOperator(clientFd))
 	{
-		sendNumeric(clientFd, "482 " + channelName + " :You're not channel operator");
+		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
 
@@ -166,7 +166,7 @@ void Server::mode_l(int clientFd, Channel &channel, const std::string &channelNa
 		long v = ft_strtol(s, &endptr);
 		if (*endptr != '\0' || v < 0)
 		{
-			sendNumeric(clientFd, "461 MODE :Not enough parameters");
+			sendNumericMessage(clientFd, "461 MODE :Not enough parameters");
 			return;
 		}
 		channel.setLimit((int)v);
@@ -177,7 +177,7 @@ void Server::mode_l(int clientFd, Channel &channel, const std::string &channelNa
 		{
 			int fd = *iterator;
 			if (_clients.find(fd) != _clients.end())
-				sendNumeric(fd, out);
+				sendNumericMessage(fd, out);
 			++iterator;
 		}
 	}
@@ -191,7 +191,7 @@ void Server::mode_l(int clientFd, Channel &channel, const std::string &channelNa
 		{
 			int fd = *iterator;
 			if (_clients.find(fd) != _clients.end())
-				sendNumeric(fd, out);
+				sendNumericMessage(fd, out);
 			++iterator;
 		}
 	}
@@ -208,7 +208,7 @@ void Server::mode_user(int clientFd, const std::string &target, const std::strin
 	if (myNick.empty() || myNick != target)
 	{
 		// ERR_USERSDONTMATCH 502
-		sendNumeric(clientFd, "502 :Cannot change mode for other users");
+		sendNumericMessage(clientFd, "502 :Cannot change mode for other users");
 		return;
 	}
 
@@ -229,7 +229,7 @@ void Server::mode_user(int clientFd, const std::string &target, const std::strin
 	{
 		// petición de ver modos del usuario: podemos devolver un echo simple
 		std::string reply = ":ircserv 221 " + myNick + " :User modes";
-		sendNumeric(clientFd, reply);
+		sendNumericMessage(clientFd, reply);
 		return;
 	}
 
@@ -263,18 +263,18 @@ void Server::mode_user(int clientFd, const std::string &target, const std::strin
 
 			// añadir a applied; simplificamos: concatenamos +i/-i según corresponda
 			if (plus)
-				applied += "+i";
+				applied = applied + "+i";
 			else
-				applied += "-i";
+				applied = applied + "-i";
 		}
 		else
-			sendNumeric(clientFd, "501 :Unknown MODE flag"); // UMODEUNKNOWNFLAG 501
+			sendNumericMessage(clientFd, "501 :Unknown MODE flag"); // UMODEUNKNOWNFLAG 501
 	}
 
 	if (!applied.empty())
 	{
 		// Enviar eco al propio cliente (y podrías notificar a otros según necesidades)
 		std::string echo = ":" + myNick + " MODE " + target + " " + applied;
-		sendNumeric(clientFd, echo);
+		sendNumericMessage(clientFd, echo);
 	}
 }

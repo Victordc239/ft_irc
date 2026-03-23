@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 15:06:23 by sofernan          #+#    #+#             */
-/*   Updated: 2026/03/17 14:54:43 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 15:00:15 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,7 +14,7 @@
 
 Bot::Bot()
 {
-	_name = "irc_bot";
+	_name = "bot";
 }
 
 Bot::Bot(const Bot &other)

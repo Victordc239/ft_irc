@@ -6,13 +6,14 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/19 17:13:30 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 14:58:44 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-bool Server::nickInUse(const std::string &nick) const
+// Comprueba si un nick ya lo está usando algún cliente
+bool Server::isNickInUse(const std::string &nick) const
 {
 	std::map<int, Client>::const_iterator iterator = _clients.begin();
 
@@ -25,7 +26,8 @@ bool Server::nickInUse(const std::string &nick) const
 	return (false);
 }
 
-int Server::getFdByNick(const std::string &nick) const
+// Devuelve el fd (socket) de un cliente a partir de su nick
+int Server::findFdByNick(const std::string &nick) const
 {
 	std::map<int, Client>::const_iterator iterator = _clients.begin();
 
@@ -38,9 +40,8 @@ int Server::getFdByNick(const std::string &nick) const
 	return (-1);
 }
 
-
 // helper para enviar mensajes numéricos o líneas
-/* void Server::sendNumeric(int fd, const std::string &msg)
+/* void Server::sendNumericMessage(int fd, const std::string &msg)
 {
 	// Si no conocemos el cliente, ignorar
 	if (_clients.find(fd) == _clients.end())
@@ -49,7 +50,7 @@ int Server::getFdByNick(const std::string &nick) const
 	// Construir la línea completa con CRLF y encolar
 	std::string full = msg + "\r\n";
 	std::string &out = _clients[fd].outbuf;
-	out += full;
+	out = out + full;
 
 	// Intentar enviar ahora mismo (non-blocking). Si se envía todo, no necesitamos POLLOUT.
 	if (!out.empty())
@@ -59,7 +60,7 @@ int Server::getFdByNick(const std::string &nick) const
 			out.erase(0, s);
 		else if (s == -1 && (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR))
 		{
-			std::cerr << "ERROR sendNumeric: send() failed for fd " << fd << " errno=" << errno << " (" << strerror(errno) << ")\n";
+			std::cerr << "ERROR sendNumericMessage: send() failed for fd " << fd << " errno=" << errno << " (" << strerror(errno) << ")\n";
 			// Manejo minimal: cerrar cliente aquí como haces en other places
 			close(fd);
 			_clients.erase(fd);
@@ -120,7 +121,8 @@ int Server::getFdByNick(const std::string &nick) const
 	}
 } */
 
-void Server::sendNumeric(int fd, const std::string &msg)
+// Guarda y prepara mensajes numéricos formateados para enviarlos del servidor al cliente 
+void Server::sendNumericMessage(int fd, const std::string &msg)
 {
 	// Si no conocemos el cliente, ignorar
 	if (_clients.find(fd) == _clients.end())
@@ -152,7 +154,7 @@ void Server::sendNumeric(int fd, const std::string &msg)
 	}
 
 	// Encolar el mensaje (NO intentar send() aquí)
-	out += full;
+	out = out + full;
 
 	// Si aún queda algo por enviar, asegurarnos de monitorizar POLLOUT.
 	if (!out.empty())
@@ -196,6 +198,7 @@ void Server::sendNumeric(int fd, const std::string &msg)
 	}
 }
 
+// Inicializa el servidor con valores por defecto
 Server::Server()
 {
 	_server_fd = -1;
@@ -204,6 +207,7 @@ Server::Server()
 	_nextTransferId = 1;
 }
 
+// Crea una copia del servidor sin copiar conexiones activas
 Server::Server(const Server &other)
 {
 	_server_fd = -1;
@@ -214,6 +218,7 @@ Server::Server(const Server &other)
 	_clients.clear();
 }
 
+// Copia un servidor en otro, cerrando antes conexiones existentes
 Server &Server::operator=(const Server &other)
 {
 	if (this == &other)
@@ -238,6 +243,7 @@ Server &Server::operator=(const Server &other)
 	return (*this);
 }
 
+// Cierra todos los sockets al destruir el servidor
 Server::~Server()
 {
 	if (_server_fd != -1)
@@ -251,9 +257,10 @@ Server::~Server()
 	}
 }
 
-/*esta funcion hace que el socket no sea blocante, es decir que el primer cliente
-bloquearia a los siguientes si no envia nada y los siguientes se quieren conectar o mandar algo*/
-int Server::setNonblock(int fd)
+// Esta función configura el socket para que no sea bloqueante.
+// Por defecto, si un cliente no envía datos, podría bloquear a otros clientes que intentan conectarse
+// o enviar mensajes. Con este modo, cada cliente puede enviar y recibir sin afectar a los demás.
+int Server::setNonBlocking(int fd)
 {
 	// int flags = fcntl(fd, F_GETFL, 0);
 	// if (flags == -1)
@@ -265,6 +272,7 @@ int Server::setNonblock(int fd)
 	return (0);
 }
 
+// Crea el socket del servidor, lo configura y empieza a escuchar conexiones
 bool Server::InitSocketAndListen(long port, const std::string &password)
 {
 	_serverPassword = password;
@@ -306,12 +314,10 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 
 		return (false);
 	}
-
 	// Hacer socket no bloqueante
-	if (Server::setNonblock(_server_fd) == -1)
+	if (Server::setNonBlocking(_server_fd) == -1)
 	{
 		std::cerr << "ERROR: no se pudo poner server_fd non-blocking\n";
-
 		// limpiar y salir: cerrar server_fd y cualquier otro fd abierto
 		if (_server_fd != -1)
 		{
@@ -329,7 +335,6 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 
 		return (false);
 	}
-
 	// Dirección servidor
 	sockaddr_in server_addr; //estructura que ya existe para guardar ip y puerto del servidor
 	std::memset(&server_addr, 0, sizeof(server_addr)); //seteamos a 0 toda la estructura
@@ -369,7 +374,8 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 	return (true);
 }
 
-bool Server::handleClientReadEvent(size_t i)
+// Lee los bytes que el cliente envía por su socket, ejecuta sus comandos, registra usuarios y gestiona desconexiones
+bool Server::handleClientEvent(size_t i)
 {
 	// Lectura normal en cliente (POLLIN)
 	if (!(_fds[i].revents & POLLIN))
@@ -394,7 +400,7 @@ bool Server::handleClientReadEvent(size_t i)
 				// Siempre permitir PASS y CAP antes del registro
 				handleInitialAuthentication(i, line);
 
-				// Cliente NO registrado aún.
+				// Cliente NO registrado aún
 				if (line.compare(0, 5, "NICK ") == 0)
 					handleNickCommand(clientFd, line);
 				else if (line.compare(0, 5, "USER ") == 0)
@@ -411,7 +417,7 @@ bool Server::handleClientReadEvent(size_t i)
 					if (client.username.empty())
 						std::cout << "USER ";
 					std::cout << std::endl;
-					sendNumeric(clientFd, "451 :You have not registered"); // ERR_NOTREGISTERED 451
+					sendNumericMessage(clientFd, "451 :You have not registered"); // ERR_NOTREGISTERED 451
 				}
 
 				// Si ya tenemos PASS correcto + NICK + USER → registrar
@@ -419,7 +425,7 @@ bool Server::handleClientReadEvent(size_t i)
 				{
 					_clients[clientFd].registered = true;
 					std::string welcome = "001 " + _clients[clientFd].nickname + " :Welcome to the simple IRCd";
-					sendNumeric(clientFd, welcome);
+					sendNumericMessage(clientFd, welcome);
 					std::cout << "fd " << clientFd << " registrado (PASS+NICK+USER). Enviada 001.\n"; // enviar RPL_WELCOME (001)
 				}
 			}
@@ -453,7 +459,7 @@ bool Server::handleClientReadEvent(size_t i)
 				else if (line.compare(0, 5, "PING ") == 0)
 				{
 					std::string ping_target = line.substr(5);
-					sendNumeric(clientFd, "PONG " + ping_target);
+					sendNumericMessage(clientFd, "PONG " + ping_target);
 					std::cout << "fd " << clientFd << " -> Respondido PONG a [" << ping_target << "]\n";
 				}
 				//una vez ya autorizado respondemos si nos ponen denuevo estos comandos de autorizacion
@@ -462,7 +468,7 @@ bool Server::handleClientReadEvent(size_t i)
 					std::string cur = _clients[clientFd].nickname;
 					if (cur.empty())
 						cur = "*";
-					sendNumeric(clientFd, ":ircserv 462 " + cur + " :You may not reregister"); // ERR_ALREADYREGISTERED 462
+					sendNumericMessage(clientFd, ":ircserv 462 " + cur + " :You may not reregister"); // ERR_ALREADYREGISTERED 462
 				}
 				//NICK = cambiar el nickname una vez el cliente ya esta registrado
 				else if (line.compare(0, 5, "NICK ") == 0)
@@ -496,13 +502,13 @@ bool Server::handleClientReadEvent(size_t i)
 						std::map<int, Client>::iterator it = _clients.begin();
 						while (it != _clients.end())
 						{
-							sendNumeric(it->first, out);
+							sendNumericMessage(it->first, out);
 							++it;
 						}
 					}
 				}
 				else
-					sendNumeric(clientFd, "421 :Unknown command"); //Comandos no implementados o desconocidgos
+					sendNumericMessage(clientFd, "421 :Unknown command"); //Comandos no implementados o desconocidgos
 			}
 			_clients[clientFd].accum.erase(0, pos + 1);
 		}
@@ -539,6 +545,7 @@ bool Server::handleClientReadEvent(size_t i)
 	return (false);
 }
 
+// Bucle principal que gestiona conexiones, mensajes y eventos del servidor
 int Server::runServerLoop()
 {
 	while (g_running)
@@ -601,7 +608,7 @@ int Server::runServerLoop()
 						std::cerr << "ERROR en accept nuevo cliente\n";
 						break;
 					}
-					if (Server::setNonblock(client_fd) == -1)
+					if (Server::setNonBlocking(client_fd) == -1)
 					{
 						std::cerr << "WARNING: no se pudo poner client_fd non-blocking\n";
 						close(client_fd);
@@ -624,7 +631,7 @@ int Server::runServerLoop()
 				++i;
 				continue;
 			}
-			if (handleClientReadEvent(i)) // Lectura normal en cliente (POLLIN)
+			if (handleClientEvent(i)) // Lectura normal en cliente (POLLIN)
 				continue;
 			// Manejo de POLLOUT para sockets de cliente normales (enviar buffer de servidor->cliente)
 			if (_fds[i].revents & POLLOUT)

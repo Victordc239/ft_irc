@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 14:14:47 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/19 17:13:30 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 14:45:31 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -52,7 +52,7 @@ bool	Server::flushBufferToFd(std::vector<struct pollfd> &fds, FileTransfer &ft, 
 		if (sent > 0)
 		{
 			if (countBytes)
-				ft.bytesTransferred += (unsigned long)sent;
+				ft.bytesTransferred = ft.bytesTransferred + (unsigned long)sent;
 			buffer.erase(0, sent);
 		}
 		else if (sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
@@ -101,7 +101,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 			int newfd = accept(ft.socketFileTransfer, (struct sockaddr*)&peerAddr, &alen);
 			if (newfd != -1)
 			{
-				if (Server::setNonblock(newfd) == -1)
+				if (Server::setNonBlocking(newfd) == -1)
 				{
 					close(newfd);
 					newfd = -1;
@@ -147,7 +147,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 							std::string sNick = _clients[ft.senderFd].nickname;
 							if (sNick.empty())
 								sNick = intToString(ft.senderFd);
-							sendNumeric(ft.senderFd, ":ircserv NOTICE " + sNick + " :DCC proxy connection established for id=" + intToString((int)ft.id));
+							sendNumericMessage(ft.senderFd, ":ircserv NOTICE " + sNick + " :DCC proxy connection established for id=" + intToString((int)ft.id));
 						}
 					}
 				}
@@ -390,10 +390,10 @@ bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std:
 					close(s);
 			}
 			else
-				sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy could not create outbound socket to sender; proxy will wait for connections");
+				sendNumericMessage(clientFd, ":ircserv NOTICE :DCC proxy could not create outbound socket to sender; proxy will wait for connections");
 		}
 		else
-			sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy couldn't parse sender address from CTCP; proxy will wait for incoming connections");
+			sendNumericMessage(clientFd, ":ircserv NOTICE :DCC proxy couldn't parse sender address from CTCP; proxy will wait for incoming connections");
 	}
 
 	// Obtener IP del servidor para enviar al receptor (si no se puede, usar 127.0.0.1)
@@ -434,7 +434,7 @@ bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std:
 	if (port == 0)
 	{
 		// fallback: puerto inválido
-		sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (listener port=0)");
+		sendNumericMessage(clientFd, ":ircserv NOTICE :DCC proxy internal error (listener port=0)");
 		return (true);
 	}
 
@@ -443,13 +443,13 @@ bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std:
 	std::string outmsg = ":" + prefix + " PRIVMSG " + target + " :" + dccmsg;
 
 	// Enviar al receptor el CTCP con IP/puerto del proxy
-	sendNumeric(dst_fd, outmsg);
+	sendNumericMessage(dst_fd, outmsg);
 
 	// Informar al emisor (opcional, mensaje NOTICE)
 	std::string senderNick = _clients[clientFd].nickname;
 	if (senderNick.empty())
 		senderNick = intToString(clientFd);
-	sendNumeric(clientFd, ":ircserv NOTICE " + senderNick + " :DCC proxy created id=" + intToString((int)transferId));
+	sendNumericMessage(clientFd, ":ircserv NOTICE " + senderNick + " :DCC proxy created id=" + intToString((int)transferId));
 
 	return (true);
 }
@@ -523,9 +523,9 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 		if (ft.createListener() != 0)
 		{
 			// fallo: avisar al emisor y reenviar el PRIVMSG original como fallback
-			sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy failed to create listener");
+			sendNumericMessage(clientFd, ":ircserv NOTICE :DCC proxy failed to create listener");
 			std::string fallback = ":" + prefix + " PRIVMSG " + target + " :" + text;
-			sendNumeric(dst_fd, fallback);
+			sendNumericMessage(dst_fd, fallback);
 			return (true);
 		}
 
@@ -542,7 +542,7 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 		if (lfd == -1)
 		{
 			// fallback seguro (no debería ocurrir si createListener() tuvo éxito)
-			sendNumeric(clientFd, ":ircserv NOTICE :DCC proxy internal error (no listener fd)");
+			sendNumericMessage(clientFd, ":ircserv NOTICE :DCC proxy internal error (no listener fd)");
 			return (true);
 		}
 
