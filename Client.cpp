@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Client.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:11 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 16:30:55 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/23 17:48:37 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,8 +15,8 @@
 Client::Client()
 {
 	fd = -1;
-	accum = "";
-	outbuf = "";
+	accumulator = "";
+	outBuffer = "";
 	correctPass = false;
 	nickname = "";
 	username = "";
@@ -28,8 +28,8 @@ Client::Client()
 Client::Client(int fd_client)
 {
 	fd = fd_client;
-	accum = "";
-	outbuf = "";
+	accumulator = "";
+	outBuffer = "";
 	correctPass = false;
 	nickname = "";
 	username = "";
@@ -41,8 +41,8 @@ Client::Client(int fd_client)
 Client::Client(const Client &other)
 {
 	fd = other.fd;
-	accum = other.accum;
-	outbuf = other.outbuf;
+	accumulator = other.accumulator;
+	outBuffer = other.outBuffer;
 	correctPass = other.correctPass;
 	nickname = other.nickname;
 	username = other.username;
@@ -56,8 +56,8 @@ Client &Client::operator=(const Client &other)
 	if (this != &other)
 	{
 		fd = other.fd;
-		accum = other.accum;
-		outbuf = other.outbuf;
+		accumulator = other.accumulator;
+		outBuffer = other.outBuffer;
 		correctPass = other.correctPass;
 		nickname = other.nickname;
 		username = other.username;

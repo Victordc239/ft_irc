@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 14:14:47 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 14:45:31 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 17:48:37 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -146,8 +146,8 @@ bool Server::handleFileTransferEvent(size_t &i)
 						{
 							std::string sNick = _clients[ft.senderFd].nickname;
 							if (sNick.empty())
-								sNick = intToString(ft.senderFd);
-							sendNumericMessage(ft.senderFd, ":ircserv NOTICE " + sNick + " :DCC proxy connection established for id=" + intToString((int)ft.id));
+								sNick = convertIntToString(ft.senderFd);
+							sendNumericMessage(ft.senderFd, ":ircserv NOTICE " + sNick + " :DCC proxy connection established for id=" + convertIntToString((int)ft.id));
 						}
 					}
 				}
@@ -232,11 +232,11 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 			else
 				dst = ft.senderFdRedDDC;
 
-			std::string *outbuf;
+			std::string *outBuffer;
 			if (isPeer)
-				outbuf = &ft.buf_peer_to_remote;
+				outBuffer = &ft.buf_peer_to_remote;
 			else
-				outbuf = &ft.buf_remote_to_peer;
+				outBuffer = &ft.buf_remote_to_peer;
 
 			if (dst != -1)
 			{
@@ -245,7 +245,7 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 					countBytes = true;
 				else
 					countBytes = false;
-				if (!flushBufferToFd(_fds, ft, *outbuf, dst, countBytes))
+				if (!flushBufferToFd(_fds, ft, *outBuffer, dst, countBytes))
 					ft.closeAll();
 			}
 		}
@@ -273,11 +273,11 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 	// 4) POLLOUT
 	if ((isPeer || isRemote) && (_fds[i].revents & POLLOUT))
 	{
-		std::string *outbuf;
+		std::string *outBuffer;
 		if (isPeer)
-			outbuf = &ft.buf_remote_to_peer;
+			outBuffer = &ft.buf_remote_to_peer;
 		else
-			outbuf = &ft.buf_peer_to_remote;
+			outBuffer = &ft.buf_peer_to_remote;
 
 		bool countBytes;
 		if (isPeer)
@@ -285,10 +285,10 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 		else
 			countBytes = true;
 
-		if (!flushBufferToFd(_fds, ft, *outbuf, curFd, countBytes))
+		if (!flushBufferToFd(_fds, ft, *outBuffer, curFd, countBytes))
 			ft.closeAll();
 
-		if (outbuf->empty())
+		if (outBuffer->empty())
 			setPollEvents(_fds, curFd, POLLIN);
 		++i;
 		return (true);
@@ -315,6 +315,25 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 		return (true);
 	}
 	return (false);
+}
+
+bool	parseDccIpToken(const std::string &tok, struct in_addr &out)
+{
+	// Caso 1: IP decimal estilo DCC (ej: 2130706433)
+	char *endptr = NULL;
+	unsigned long ip_dec = strtoul(tok.c_str(), &endptr, 10);
+	if (!tok.empty() && *endptr == '\0')
+	{
+		out.s_addr = htonl((uint32_t)ip_dec);
+		return (true);
+	}
+
+	// Caso 2: IP normal con puntos (ej: 127.0.0.1)
+	out.s_addr = inet_addr(tok.c_str());
+	if (out.s_addr == INADDR_NONE && tok != "255.255.255.255")
+		return (false);
+
+	return (true);
 }
 
 bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std::vector<std::string> &toks, const std::string &prefix, const std::string &target, const std::string &filename, unsigned long fsize, unsigned long transferId)
@@ -439,7 +458,7 @@ bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std:
 	}
 
 	// Formato clásico DCC: IP en decimal (host order) y puerto en decimal.
-	std::string dccmsg = "\001DCC SEND " + filename + " " + intToString((int)ip_decimal) + " " + intToString((int)port) + " " + intToString((int)fsize) + "\001";
+	std::string dccmsg = "\001DCC SEND " + filename + " " + convertIntToString((int)ip_decimal) + " " + convertIntToString((int)port) + " " + convertIntToString((int)fsize) + "\001";
 	std::string outmsg = ":" + prefix + " PRIVMSG " + target + " :" + dccmsg;
 
 	// Enviar al receptor el CTCP con IP/puerto del proxy
@@ -448,8 +467,8 @@ bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std:
 	// Informar al emisor (opcional, mensaje NOTICE)
 	std::string senderNick = _clients[clientFd].nickname;
 	if (senderNick.empty())
-		senderNick = intToString(clientFd);
-	sendNumericMessage(clientFd, ":ircserv NOTICE " + senderNick + " :DCC proxy created id=" + intToString((int)transferId));
+		senderNick = convertIntToString(clientFd);
+	sendNumericMessage(clientFd, ":ircserv NOTICE " + senderNick + " :DCC proxy created id=" + convertIntToString((int)transferId));
 
 	return (true);
 }

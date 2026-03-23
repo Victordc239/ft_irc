@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 14:58:44 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 18:21:29 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -49,7 +49,7 @@ int Server::findFdByNick(const std::string &nick) const
 
 	// Construir la línea completa con CRLF y encolar
 	std::string full = msg + "\r\n";
-	std::string &out = _clients[fd].outbuf;
+	std::string &out = _clients[fd].outBuffer;
 	out = out + full;
 
 	// Intentar enviar ahora mismo (non-blocking). Si se envía todo, no necesitamos POLLOUT.
@@ -130,7 +130,7 @@ void Server::sendNumericMessage(int fd, const std::string &msg)
 
 	// Construir la línea completa con CRLF y encolar
 	std::string full = msg + "\r\n";
-	std::string &out = _clients[fd].outbuf;
+	std::string &out = _clients[fd].outBuffer;
 
 	// --- Protección: no permitir crecimiento infinito del buffer ---
 	// Si el nuevo tamaño supera 1048576, desconectamos el cliente para
@@ -379,18 +379,18 @@ bool Server::handleClientEvent(size_t i)
 {
 	// Lectura normal en cliente (POLLIN)
 	if (!(_fds[i].revents & POLLIN))
-		return false;
+		return (false);
 
 	int clientFd = _fds[i].fd;
 	ssize_t n = recv(clientFd, _buf, BUF_SIZE, 0); //la cantidad de bytes que ha enviado el cliente al servidor
 
 	if (n > 0)
 	{
-		_clients[clientFd].accum.append(_buf, _buf + n);
+		_clients[clientFd].accumulator.append(_buf, _buf + n);
 		size_t pos;
-		while ((pos = _clients[clientFd].accum.find('\n')) != std::string::npos)
+		while ((pos = _clients[clientFd].accumulator.find('\n')) != std::string::npos)
 		{
-			std::string line = _clients[clientFd].accum.substr(0, pos);
+			std::string line = _clients[clientFd].accumulator.substr(0, pos);
 			if (!line.empty() && line[line.size() - 1] == '\r')
 				line.erase(line.size() - 1);
 
@@ -398,7 +398,7 @@ bool Server::handleClientEvent(size_t i)
 			if (!_clients[clientFd].registered)
 			{
 				// Siempre permitir PASS y CAP antes del registro
-				handleInitialAuthentication(i, line);
+				handleAuthenticationCmds(i, line);
 
 				// Cliente NO registrado aún
 				if (line.compare(0, 5, "NICK ") == 0)
@@ -433,7 +433,7 @@ bool Server::handleClientEvent(size_t i)
 			{
 				// como irssi manda CAP para imprimir mensaje en el servidor de que lo ignoramos
 				if (line.compare(0, 4, "CAP ") == 0)
-					handleInitialAuthentication(i, line);
+					handleAuthenticationCmds(i, line);
 				//JOIN = para conectarte a un canal, los canales se llaman con prefijos: # ! & +
 				else if (line.compare(0, 5, "JOIN ") == 0)
 					handleJoinCommand(clientFd, line);
@@ -454,7 +454,7 @@ bool Server::handleClientEvent(size_t i)
 					handleTopicCommand(clientFd, line);
 				//MODE = operator puede cambiar diversas cosas con la flag +i +t +k +o +l
 				else if (line.compare(0, 5, "MODE ") == 0)
-					handleModeCommand(clientFd, line);
+					handleChannelModes(clientFd, line);
 				// IRSSI(cliente) esta mandando PING y si no contestamos PONG IRSSI(cliente) se desconecta
 				else if (line.compare(0, 5, "PING ") == 0)
 				{
@@ -479,7 +479,7 @@ bool Server::handleClientEvent(size_t i)
 					// Construimos el prefijo antiguo nick!user@host
 					std::string displayOldNick;
 					if (originalNick.empty())
-						displayOldNick = intToString(clientFd);
+						displayOldNick = convertIntToString(clientFd);
 					else
 						displayOldNick = originalNick;
 
@@ -510,7 +510,7 @@ bool Server::handleClientEvent(size_t i)
 				else
 					sendNumericMessage(clientFd, "421 :Unknown command"); //Comandos no implementados o desconocidgos
 			}
-			_clients[clientFd].accum.erase(0, pos + 1);
+			_clients[clientFd].accumulator.erase(0, pos + 1);
 		}
 	}
 	else if (n == 0) // Cliente cerró conexión de forma ordenada -> limpiar también transfers relacionados
@@ -646,7 +646,7 @@ int Server::runServerLoop()
 					continue;
 				}
 
-				std::string &data = _clients[fd].outbuf;
+				std::string &data = _clients[fd].outBuffer;
 
 				while (!data.empty())
 				{
@@ -674,7 +674,7 @@ int Server::runServerLoop()
 				}
 
 				//Si ya terminé de enviar todo al cliente, deja de preguntarle al sistema si puedo escribir
-				if (_clients.find(fd) != _clients.end() && _clients[fd].outbuf.empty())
+				if (_clients.find(fd) != _clients.end() && _clients[fd].outBuffer.empty())
 					_fds[i].events &= ~POLLOUT; /*esta linea=Deja de vigilar escritura para este socket y la ~ es para invertir todos los bits de POLLOUT*/
 			}
 			++i; // avanzar al siguiente fd

@@ -6,16 +6,16 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 14:40:51 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 18:40:42 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-//    FASE INICIAL DE AUTENTICACIÓN
-//    Ahora NO cerramos conexión si el orden es incorrecto. Permitimos PASS en cualquier momento antes del registro.
-//    Si es incorrecto enviamos 464 pero NO cerramos. CAP se ignora.
-bool Server::handleInitialAuthentication(size_t &i, const std::string &line)
+// FASE INICIAL DE AUTENTICACIÓN. Procesa comandos iniciales de autenticación (PASS y CAP) y marca si la contraseña es correcta, ignorando CAP.
+// Ahora NO cerramos conexión si el orden es incorrecto. Permitimos PASS en cualquier momento antes del registro.
+// Si es incorrecto enviamos 464 pero NO cerramos. CAP se ignora.
+bool Server::handleAuthenticationCmds(size_t &i, const std::string &line)
 {
 	int clientFd = _fds[i].fd;
 
@@ -72,6 +72,7 @@ bool Server::handleInitialAuthentication(size_t &i, const std::string &line)
 	return (false);
 }
 
+// Asigna un nickname a un cliente verificando que no esté en uso y enviando error si falla
 void Server::handleNickCommand(int clientFd, const std::string &line)
 {
 	// Extraer argumento tras "NICK "
@@ -124,6 +125,7 @@ void Server::handleNickCommand(int clientFd, const std::string &line)
 	std::cout << "fd " << clientFd << " set NICK=" << newnick << "\n";
 }
 
+// Registra el nombre de usuario del cliente con el comando USER
 void Server::handleUserCommand(int clientFd, const std::string &line)
 {
 	// FORMATO: USER <user> <mode> <unused> :<realname>
@@ -155,12 +157,13 @@ void Server::handleUserCommand(int clientFd, const std::string &line)
 	{
 		_clients[clientFd].username = user;
 		_clients[clientFd].realname = realname;
-		std::cout << "fd " << clientFd << " set USER=" << user << " REAL=" << realname << "\n";
+		std::cout << "fd " << clientFd << " set USER=" << user << "\n";
 	}
 	else
 		sendNumericMessage(clientFd, "461 USER :Not enough parameters"); 	// ERR_NEEDMOREPARAMS 461 (usar sendNumericMessage en vez de send directo)
 }
 
+// Permite a un cliente unirse a un canal, creando el canal si no existe, validando permisos y claves
 void Server::handleJoinCommand(int clientFd, const std::string &line)
 {
 	// Formato esperado: "JOIN <#channel> [key]"
@@ -232,19 +235,19 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 	Channel &channel = _channels[nameChannel];
 
 	// si ya está en el canal, ignorar (o podrías enviar 443 ERR_USERONCHANNEL)
-	if (channel.hasClient(clientFd))
+	if (channel.isClientInChannel(clientFd))
 	{
 		std::cout << "JOIN: fd " << clientFd << " ya estaba en " << nameChannel << "\n";
 		return;
 	}
 
 	// === CHECK: invite-only (+i) ===
-	if (channel.isInviteOnly() && !channel.isInvited(clientFd))
+	if (channel.isInviteOnly() && !channel.isClientInvited(clientFd))
 	{
 		// ERR_INVITEONLYCHAN 473
 		std::string nick = _clients[clientFd].nickname;
 		if (nick.empty())
-			nick = intToString(clientFd);
+			nick = convertIntToString(clientFd);
 		sendNumericMessage(clientFd, "473 " + nick + " " + nameChannel + " :Cannot join channel (+i)");
 		return;
 	}
@@ -257,18 +260,18 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		{
 			std::string nick = _clients[clientFd].nickname;
 			if (nick.empty())
-				nick = intToString(clientFd);
+				nick = convertIntToString(clientFd);
 			sendNumericMessage(clientFd, "475 " + nick + " " + nameChannel + " :Cannot join channel (+k)");
 			return;
 		}
 	}
 
 	// === CHECK: limit (+l) ===
-	if (channel.getLimit() > 0 && (int)channel.clients.size() >= channel.getLimit())
+	if (channel.getUserLimit() > 0 && (int)channel.clients.size() >= channel.getUserLimit())
 	{
 		std::string nick = _clients[clientFd].nickname;
 		if (nick.empty())
-			nick = intToString(clientFd);
+			nick = convertIntToString(clientFd);
 		sendNumericMessage(clientFd, "471 " + nick + " " + nameChannel + " :Cannot join channel (+l)");
 		return;
 	}
@@ -277,16 +280,17 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 	channel.addClient(clientFd);
 
 	// Si venía por invitación, consumirla (la invitación se gasta)
-	if (channel.isInvited(clientFd))
-		channel.removeInvite(clientFd);
+	if (channel.isClientInvited(clientFd))
+		channel.removeInvitedClient(clientFd);
 
 	// A partir de aquí nos limitamos a delegar la construcción y envío de replies/broadcast
 	// a la función auxiliar, para mantener esta función centrada en parsing/validación.
 	// La función auxiliar asumirá que clientFd ya ha sido añadido a channel.clients.
-	sendJoinReplies(clientFd, nameChannel);
+	sendJoinInfo(clientFd, nameChannel);
 }
 
-void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
+// Envía a todos los miembros del canal los mensajes de unión, modos, topic y lista de usuarios
+void Server::sendJoinInfo(int clientFd, const std::string &nameChannel)
 {
 	// Asumimos que nameChannel existe en _channels y que clientFd ya está en channel.clients
 	Channel &channel = _channels[nameChannel];
@@ -296,7 +300,7 @@ void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
 	std::string user = _clients[clientFd].username;
 
 	if (nick.empty())
-		nick = intToString(clientFd);
+		nick = convertIntToString(clientFd);
 
 	if (user.empty())
 		user = "user";
@@ -323,7 +327,6 @@ void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
 		sendNumericMessage(fd, joinmsg);
 		++iteratorMessageJoin;
 	}
-
 	// Enviar estado de modos del canal (RPL_CHANNELMODEIS 324)
 	// Construimos la cadena de modos y sus parámetros (si corresponde).
 	std::string modes = "";
@@ -337,10 +340,10 @@ void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
 		modes = modes + "k";
 		params = params + " " + channel.getKey();
 	}
-	if (channel.getLimit() > 0)
+	if (channel.getUserLimit() > 0)
 	{
 		modes = modes + "l";
-		params = params + " " + intToString(channel.getLimit());
+		params = params + " " + convertIntToString(channel.getUserLimit());
 	}
 
 	if (!modes.empty())
@@ -349,7 +352,6 @@ void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
 		std::string reply = ":ircserv 324 " + nick + " " + nameChannel + " +" + modes + params;
 		sendNumericMessage(clientFd, reply);
 	}
-
 	// Enviar TOPIC (332) o NOTOPIC (331)
 	// Muchos clientes esperan este reply antes de procesar NAMES.
 	std::string topic = "";
@@ -379,11 +381,11 @@ void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
 
 		std::string entryNick;
 		if (_clients[fd].nickname.empty())
-			entryNick = intToString(fd);
+			entryNick = convertIntToString(fd);
 		else
 			entryNick = _clients[fd].nickname;
 
-		if (channel.isOperator(fd))
+		if (channel.isClientOperator(fd))
 			names = names + "@" + entryNick + " ";
 		else
 			names = names + entryNick + " ";
@@ -399,6 +401,7 @@ void Server::sendJoinReplies(int clientFd, const std::string &nameChannel)
 	std::cout << "JOIN: cliente fd " << clientFd << " unido a " << nameChannel << "\n";
 }
 
+// Permite a un cliente salir de un canal, notificando a todos los miembros y eliminando el canal si queda vacío
 void Server::handlePartCommand(int clientFd, const std::string &line)
 {
 	// Prefijo "PART " longitud 5
@@ -441,7 +444,6 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 			(void)maybe;
 		}
 	}
-
 	// trim sencillo de channelName (inicio/fin)
 	while (!channelName.empty() && (channelName[0] == ' ' || channelName[0] == '\t'))
 		channelName.erase(0, 1);
@@ -454,8 +456,7 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 		sendNumericMessage(clientFd, "461 PART :Not enough parameters");
 		return;
 	}
-
-	// Existe el canal?
+	// Comprueba si existe el canal
 	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
 	if (it == _channels.end())
 	{
@@ -463,30 +464,26 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 		return;
 	}
 	Channel &channel = it->second;
-
 	// Comprueba que el emisor esté en el canal
-	if (!channel.hasClient(clientFd))
+	if (!channel.isClientInChannel(clientFd))
 	{
 		sendNumericMessage(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
-
 	// Construir prefijo: nick!user@localhost
 	std::string emNick = _clients[clientFd].nickname;
 	std::string emUser = _clients[clientFd].username;
 	if (emNick.empty())
-		emNick = intToString(clientFd);
+		emNick = convertIntToString(clientFd);
 	if (emUser.empty())
 		emUser = "user";
 	std::string prefix = emNick + "!" + emUser + "@localhost";
-
 	// Construir mensaje PART
 	std::string out = ":" + prefix + " PART " + channelName;
 	if (!reason.empty())
 		out = out + " :" + reason;
 	else
 		out = out + " :";
-
 	// Enviar PART a todos los miembros del canal (incluyendo el que sale)
 	std::set<int>::iterator sit = channel.clients.begin();
 	while (sit != channel.clients.end())
@@ -496,7 +493,6 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 			sendNumericMessage(fd, out);
 		++sit;
 	}
-
 	// Quitar al cliente del canal (Channel::removeClient también quita operadores)
 	channel.removeClient(clientFd);
 
@@ -505,6 +501,8 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 		_channels.erase(it);
 }
 
+// Procesa un mensaje privado o de canal (PRIVMSG)
+// Analiza un mensaje PRIVMSG recibido, extrae el destinatario y el texto, construye el prefijo del emisor y luego delega el envío y procesamiento real del mensaje
 void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 {
 	// Formato: "PRIVMSG <target> :<message>"
@@ -522,7 +520,6 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 		sendNumericMessage(clientFd, "461 PRIVMSG :Not enough parameters");
 		return;
 	}
-
 	// extraer target (nick o canal)
 	std::string target = line.substr(prefix_len, space - prefix_len);
 
@@ -531,7 +528,6 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 		target.erase(0, 1);
 	while (!target.empty() && (target[target.size() - 1] == ' ' || target[target.size() - 1] == '\t'))
 		target.erase(target.size() - 1, 1);
-
 	// localizar ':' que inicia el texto del mensaje
 	size_t colon = line.find(':', space + 1);
 	std::string text;
@@ -565,23 +561,24 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 		if (!text.empty() && text[text.size() - 1] == '\r')
 			text.erase(text.size() - 1);
 	}
-
 	// Construcción del prefijo IRC del emisor (nick!user@host)
 	std::string nick = _clients[clientFd].nickname;
 	std::string user = _clients[clientFd].username;
 
 	if (nick.empty())
-		nick = intToString(clientFd);
+		nick = convertIntToString(clientFd);
 
 	if (user.empty())
 		user = "user";
 
 	std::string prefix = nick + "!" + user + "@localhost";
 
-	handlePrivmsgCommandBonus(clientFd, target, text, prefix, nick);
+	processPrivmsgCommand(clientFd, target, text, prefix, nick);
 }
 
-void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, const std::string &text, const std::string &prefix, const std::string &nick)
+// Procesa un mensaje PRIVMSG enviándolo al destinatario (usuario o canal), maneja respuestas automáticas 
+// del bot y controla casos especiales como mensajes CTCP o transferencias DCC.
+void Server::processPrivmsgCommand(int clientFd, const std::string &target, const std::string &text, const std::string &prefix, const std::string &nick)
 {
 	// INVOCAR AL BOT (solo si no es CTCP: no procesar mensajes que empiecen por \001)
 	std::string botReply;
@@ -603,7 +600,6 @@ void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, 
 		}
 		return;
 	}
-
 	// Si target es canal: reenviar como antes (sin DCC)
 	if (!target.empty() && (target[0] == '#' || target[0] == '&' || target[0] == '+' || target[0] == '!'))
 	{
@@ -616,7 +612,7 @@ void Server::handlePrivmsgCommandBonus(int clientFd, const std::string &target, 
 
 		Channel &channel = channelIterator->second;
 
-		if (!channel.hasClient(clientFd))
+		if (!channel.isClientInChannel(clientFd))
 		{
 			sendNumericMessage(clientFd, "442 " + target + " :You're not on that channel");
 			return;

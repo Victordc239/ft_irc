@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:57 by victor            #+#    #+#             */
-/*   Updated: 2026/03/23 15:02:00 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 18:40:42 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -88,8 +88,8 @@ void Channel::removeClient(int fd)
 	// si era operador, quitarlo también
 	operators.erase(fd);
 }
-
-bool Channel::hasClient(int fd) const
+// Comprueba si un cliente (identificado por su fd) está dentro del canal, comprueba si existe en la lista de clientes
+bool Channel::isClientInChannel(int fd) const
 {
 	return (clients.find(fd) != clients.end());
 }
@@ -104,7 +104,8 @@ void Channel::removeOperator(int fd)
 	operators.erase(fd);
 }
 
-bool Channel::isOperator(int fd) const
+// Comprueba si un cliente (por su fd) es operador del canal, comprueba si está en la lista de operadores
+bool Channel::isClientOperator(int fd) const
 {
 	return (operators.find(fd) != operators.end());
 }
@@ -126,11 +127,6 @@ bool Channel::hasTopic() const
 const std::string &Channel::getTopic() const
 {
 	return (topic);
-}
-
-time_t Channel::getTopicTime() const
-{
-	return (topic_set_time);
 }
 
 void Channel::setTopicRestricted(bool v)
@@ -173,32 +169,33 @@ void Channel::removeKey()
 	key.clear();
 }
 
-void Channel::setLimit(int n)
+void Channel::setUserLimit(int n)
 {
 	limit = n;
 }
 
-int Channel::getLimit() const
+int Channel::getUserLimit() const
 {
 	return (limit);
 }
 
-void Channel::removeLimit()
+void Channel::removeUserLimit()
 {
 	limit = 0;
 }
 
-bool Channel::isInvited(int fd) const
+// Comprueba si un cliente específico ha recibido una invitación para un canal
+bool Channel::isClientInvited(int fd) const
 {
 	return (invitedClients.find(fd) != invitedClients.end());
 }
 
-void Channel::addInvite(int fd)
+void Channel::addInvitedClient(int fd)
 {
 	invitedClients.insert(fd);
 }
 
-void Channel::removeInvite(int fd)
+void Channel::removeInvitedClient(int fd)
 {
 	invitedClients.erase(fd);
 }

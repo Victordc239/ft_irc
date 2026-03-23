@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:48 by victor            #+#    #+#             */
-/*   Updated: 2026/03/23 15:02:18 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 18:40:42 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,13 +40,12 @@ class Channel
 
 		void	addClient(int fd);
 		void	removeClient(int fd);
-		bool	hasClient(int fd) const;
+		bool	isClientInChannel(int fd) const;
 		void	addOperator(int fd);
 		void	removeOperator(int fd);
-		bool	isOperator(int fd) const;
+		bool	isClientOperator(int fd) const;
 		void	setTopic(const std::string &newTopic, const std::string &setter);
 		bool	hasTopic() const;
-		time_t	getTopicTime() const;
 		void	setTopicRestricted(bool v);
 		bool	isTopicRestricted() const;
 		void	setInviteOnly(bool v);
@@ -54,12 +53,12 @@ class Channel
 		void	setKey(const std::string &k);
 		bool	hasKey() const;
 		void	removeKey();
-		void	setLimit(int n);
-		int		getLimit() const;
-		void	removeLimit();
-		bool	isInvited(int fd) const;
-		void	addInvite(int fd);
-		void	removeInvite(int fd);
+		void	setUserLimit(int n);
+		int		getUserLimit() const;
+		void	removeUserLimit();
+		bool	isClientInvited(int fd) const;
+		void	addInvitedClient(int fd);
+		void	removeInvitedClient(int fd);
 		const std::string &getKey() const;
 		const std::string &getTopic() const;
 };

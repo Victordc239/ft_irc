@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Client.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: vdiez-cu <vdiez-cu@student.42.fr>          +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:02 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/12 15:03:42 by vdiez-cu         ###   ########.fr       */
+/*   Updated: 2026/03/23 17:48:37 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,8 +19,8 @@ class Client
 {
 	public:
 		int fd;
-		std::string accum;	// Acumulador para recibir todos los mensajes completos
-		std::string outbuf;	// Buffer para enviar mensaje de servidor a cliente
+		std::string accumulator;	// Acumulador para recibir todos los mensajes completos
+		std::string outBuffer;	// Buffer para enviar mensaje de servidor a cliente
 		bool correctPass;		// si ha autenticado correctamente
 		std::string nickname;	// nickname
 		std::string username;	// username

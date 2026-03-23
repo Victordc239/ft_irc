@@ -6,13 +6,13 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 16:21:40 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/19 16:58:25 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 17:35:30 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-std::string intToString(int n)
+std::string convertIntToString(int n)
 {
 	if (n == 0)
 		return ("0");
@@ -86,21 +86,4 @@ long ft_strtol(const char *str, char **endptr)
 	return (result * sign);
 }
 
-bool	parseDccIpToken(const std::string &tok, struct in_addr &out)
-{
-	// Caso 1: IP decimal estilo DCC (ej: 2130706433)
-	char *endptr = NULL;
-	unsigned long ip_dec = strtoul(tok.c_str(), &endptr, 10);
-	if (!tok.empty() && *endptr == '\0')
-	{
-		out.s_addr = htonl((uint32_t)ip_dec);
-		return (true);
-	}
 
-	// Caso 2: IP normal con puntos (ej: 127.0.0.1)
-	out.s_addr = inet_addr(tok.c_str());
-	if (out.s_addr == INADDR_NONE && tok != "255.255.255.255")
-		return (false);
-
-	return (true);
-}

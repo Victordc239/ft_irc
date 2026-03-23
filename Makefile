@@ -6,7 +6,7 @@
 #    By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/12/02 11:18:27 by victor            #+#    #+#              #
-#    Updated: 2026/03/16 16:59:34 by sofernan         ###   ########.fr        #
+#    Updated: 2026/03/23 18:45:00 by sofernan         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -18,7 +18,7 @@ SRCS		= main.cpp \
 			Channel.cpp \
 			ServerCommands.cpp \
 			ServerOperatorsCommands.cpp \
-			ServerCommandsModeFlags.cpp \
+			ServerCommandsMode.cpp \
 			ServerUtils.cpp \
 			FileTransfer.cpp \
 			ServerFileTransfer.cpp \

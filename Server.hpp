@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 14:59:56 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 17:26:00 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -52,20 +52,20 @@ class Server
 		bool	isNickInUse(const std::string &nick) const;
 		void	sendNumericMessage(int fd, const std::string &msg);
 		int		findFdByNick(const std::string &nick) const;
-		bool	handleInitialAuthentication(size_t &i, const std::string &line);
+		bool	handleAuthenticationCmds(size_t &i, const std::string &line);
 		void	handleNickCommand(int clientFd, const std::string &line);
 		void	handleUserCommand(int clientFd, const std::string &line);
 		void	handleJoinCommand(int clientFd, const std::string &line);
-		void	sendJoinReplies(int clientFd, const std::string &nameChannel);;
+		void	sendJoinInfo(int clientFd, const std::string &nameChannel);;
 		void	handlePartCommand(int clientFd, const std::string &line);
 		void	handlePrivmsgCommand(int clientFd, const std::string &line);
-		void	handlePrivmsgCommandBonus(int clientFd, const std::string &target, const std::string &text, const std::string &prefix, const std::string &nick);
+		void	processPrivmsgCommand(int clientFd, const std::string &target, const std::string &text, const std::string &prefix, const std::string &nick);
 		bool	handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string &text, const std::string &prefix, const std::string &target);
 		bool	handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std::vector<std::string> &toks, const std::string &prefix, const std::string &target, const std::string &filename, unsigned long fsize, unsigned long transferId);
 		void	handleKickCommand(int clientFd, const std::string &line);
 		void	handleInviteCommand(int clientFd, const std::string &line);
 		void	handleTopicCommand(int clientFd, const std::string &line);
-		void	handleModeCommand(int clientFd, const std::string &line);
+		void	handleChannelModes(int clientFd, const std::string &line);
 		void	handleModeChange(int clientFd, Channel &channel, const std::string &channelName, const std::string &rest, const std::string &nick, const std::string &prefix);
 		void	mode_i(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &prefix);
 		void	mode_t(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &prefix);
@@ -87,13 +87,13 @@ class Server
 		~Server();
 
 		bool	InitSocketAndListen(long port, const std::string &password);
-		int	setNonBlocking(int fd);
+		int		setNonBlocking(int fd);
 		bool	handleClientEvent(size_t i);
-		int	runServerLoop();
+		int		runServerLoop();
 
 };
 
-std::string	intToString(int n);
+std::string	convertIntToString(int n);
 long		ft_strtol(const char *str, char **endptr);
 bool		parseDccIpToken(const std::string &tok, struct in_addr &out);
 

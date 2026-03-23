@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/09 14:39:18 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 14:41:59 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/23 18:40:25 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -80,27 +80,27 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 		return;
 	}
 	Channel &channel = it->second;
-	// el emisor está en el canal?
-	if (!channel.hasClient(clientFd))
+	// Comprobar si el emisor está en el canal
+	if (!channel.isClientInChannel(clientFd))
 	{
 		sendNumericMessage(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
-	// el emisor es operador?
-	if (!channel.isOperator(clientFd))
+	// Comprobar si el emisor es operador
+	if (!channel.isClientOperator(clientFd))
 	{
 		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
-	// existe el nick objetivo en el servidor?
+	// Comprobar si existe el nick objetivo en el servidor
 	int targetFd = findFdByNick(targetNick);
 	if (targetFd == -1)
 	{
 		sendNumericMessage(clientFd, "401 " + targetNick + " :No such nick");
 		return;
 	}
-	// el objetivo está en el canal?
-	if (!channel.hasClient(targetFd))
+	// Comprobar si el objetivo está en el canal
+	if (!channel.isClientInChannel(targetFd))
 	{
 		sendNumericMessage(clientFd, "441 " + targetNick + " " + channelName + " :They aren't on that channel");
 		return;
@@ -109,7 +109,7 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 	std::string emNick = _clients[clientFd].nickname;
 	std::string emUser = _clients[clientFd].username;
 	if (emNick.empty())
-		emNick = intToString(clientFd);
+		emNick = convertIntToString(clientFd);
 	if (emUser.empty())
 		emUser = "user";
 	std::string prefix = emNick + "!" + emUser + "@localhost";
@@ -207,22 +207,22 @@ void	Server::handleInviteCommand(int clientFd, const std::string &line)
 	}
 	Channel &channel = it->second;
 
-	// el emisor está en el canal?
-	if (!channel.hasClient(clientFd))
+	// Comprobar si el emisor está en el canal
+	if (!channel.isClientInChannel(clientFd))
 	{
 		sendNumericMessage(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
 
 	// SOLO operadores pueden INVITE por defecto
-	if (!channel.isOperator(clientFd))
+	if (!channel.isClientOperator(clientFd))
 	{
 		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
 
-	// el objetivo ya está en el canal?
-	if (channel.hasClient(targetFd))
+	// Comprobar si el objetivo ya está en el canal
+	if (channel.isClientInChannel(targetFd))
 	{
 		sendNumericMessage(clientFd, "443 " + targetNick + " " + channelName + " :is already on channel"); // ERR_USERONCHANNEL 443
 		return;
@@ -232,7 +232,7 @@ void	Server::handleInviteCommand(int clientFd, const std::string &line)
 	std::string emNick = _clients[clientFd].nickname;
 	std::string emUser = _clients[clientFd].username;
 	if (emNick.empty())
-		emNick = intToString(clientFd);
+		emNick = convertIntToString(clientFd);
 	if (emUser.empty())
 		emUser = "user";
 	std::string prefix = emNick + "!" + emUser + "@localhost";
@@ -242,7 +242,7 @@ void	Server::handleInviteCommand(int clientFd, const std::string &line)
 	sendNumericMessage(targetFd, inviteMsg);
 
 	// Añadir invitación efectiva en la lista de invitados del canal
-	channel.addInvite(targetFd);
+	channel.addInvitedClient(targetFd);
 
 	// Notificar al emisor con RPL_INVITING (341)
 	sendNumericMessage(clientFd, "341 " + emNick + " " + targetNick + " " + channelName);
@@ -295,8 +295,7 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 		sendNumericMessage(clientFd, "461 TOPIC :Not enough parameters");
 		return;
 	}
-
-	// existe el canal?
+	// Comprueba si existe el canal
 	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
 	if (it == _channels.end())
 	{
@@ -304,23 +303,20 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 		return;
 	}
 	Channel &channel = it->second;
-
-	// el emisor está en el canal?
-	if (!channel.hasClient(clientFd))
+	// Comprueba si el emisor está en el canal
+	if (!channel.isClientInChannel(clientFd))
 	{
 		sendNumericMessage(clientFd, "442 " + channelName + " :You're not on that channel"); // ERR_NOTONCHANNEL 442
 		return;
 	}
-
 	// Construir nick y prefix como en otros comandos
 	std::string nick = _clients[clientFd].nickname;
 	std::string user = _clients[clientFd].username;
 	if (nick.empty())
-		nick = intToString(clientFd);
+		nick = convertIntToString(clientFd);
 	if (user.empty())
 		user = "user";
 	std::string prefix = nick + "!" + user + "@localhost";
-
 	// Si rest está vacío -> petición de ver topic
 	if (rest.empty())
 	{
@@ -336,22 +332,19 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 		}
 		return;
 	}
-
 	// Si rest no está vacío -> intento de set topic.
 	// El texto del topic normalmente viene tras ':'; si hay ':' al inicio de rest, saltarla.
 	std::string newTopic = rest;
 	if (!newTopic.empty() && newTopic[0] == ':')
 		newTopic.erase(0, 1); // quitar ':'
-
 	// Si el canal tiene topic_restricted y el emisor NO es operador -> error
-	if (channel.isTopicRestricted() && !channel.isOperator(clientFd))
+	if (channel.isTopicRestricted() && !channel.isClientOperator(clientFd))
 	{
 		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator"); // ERR_CHANOPRIVSNEEDED 482
 		return;
 	}
 
 	channel.setTopic(newTopic, nick); // Setear el topic (guardamos también quién lo puso)
-
 	// Notificar a todos los miembros del canal del nuevo topic
 	// Mensaje formato: :nick!user@localhost TOPIC <channel> :<topic>
 	std::string out = ":" + prefix + " TOPIC " + channelName + " :" + newTopic;
@@ -366,7 +359,11 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	}
 }
 
-void Server::handleModeCommand(int clientFd, const std::string &line)
+// Aplica los cambios de modos a un canal según los permisos del cliente, validando los parámetros
+// y enviando los mensajes correspondientes a los usuarios.
+// Se encarga de interpretar y ejecutar las modificaciones de modos (+i, +t, +k, +l, +o) para un canal, 
+// asegurándose de que solo los operadores puedan hacer ciertos cambios y notificando a todos los afectados.
+void Server::handleChannelModes(int clientFd, const std::string &line)
 {
 	const size_t prefix_len = 5; // "MODE "
 	if (line.size() <= prefix_len)
@@ -374,7 +371,6 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		sendNumericMessage(clientFd, "461 MODE :Not enough parameters");
 		return;
 	}
-
 	// Extraer channelName y resto (rest puede contener modes + params)
 	size_t space = line.find(' ', prefix_len);
 	std::string channelName;
@@ -414,7 +410,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 		return;
 	}
 
-	// existe el canal?
+	// Comprobar si existe el canal
 	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
 	if (it == _channels.end())
 	{
@@ -423,8 +419,8 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 	}
 	Channel &channel = it->second;
 
-	// emisor en canal?
-	if (!channel.hasClient(clientFd))
+	// Comprobar si está el emisor en el canal
+	if (!channel.isClientInChannel(clientFd))
 	{
 		sendNumericMessage(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
@@ -434,7 +430,7 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 	std::string nick = _clients[clientFd].nickname;
 	std::string user = _clients[clientFd].username;
 	if (nick.empty())
-		nick = intToString(clientFd);
+		nick = convertIntToString(clientFd);
 	if (user.empty())
 		user = "user";
 	std::string prefix = nick + "!" + user + "@localhost";
@@ -457,10 +453,10 @@ void Server::handleModeCommand(int clientFd, const std::string &line)
 			modes = modes + "k";
 			params = params + " " + channel.getKey();
 		}
-		if (channel.getLimit() > 0)
+		if (channel.getUserLimit() > 0)
 		{
 			modes = modes + "l";
-			params = params + " " + intToString(channel.getLimit());
+			params = params + " " + convertIntToString(channel.getUserLimit());
 		}
 		std::string reply = ":ircserv 324 " + nick + " " + channelName + " +" + modes + params;
 		sendNumericMessage(clientFd, reply);
@@ -530,7 +526,7 @@ void Server::handleModeChange(int clientFd, Channel &channel, const std::string 
 		++k;
 	}
 
-	if (!channel.isOperator(clientFd)) //solo operadores pueden cambiar modos.
+	if (!channel.isClientOperator(clientFd)) //solo operadores pueden cambiar modos.
 	{
 		if (onlyB && hasPlusSign)
 			return; // ignorar silenciosamente +b de no operadores
