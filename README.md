@@ -16,8 +16,8 @@ The project’s main goals are:
 The purpose of this project is to gain hands-on experience with network programming, socket management, and real-time communication by building a working IRC server from scratch.  
 
 Additionally, the `bonus part` of the project has been implemented to extend the server’s functionality and make it closer to a real IRC server. These extra features include:
-- File transfer support between clients.  
-- Implementation of a bot to automate interactions and responses. 
+- File transfer support between clients using DCC through a server-side proxy mechanism.
+- Implementation of a bot that automatically handles and responds to specific private or channel messages.
 
 ## 🌐 Architecture Overview
 ```text
@@ -29,9 +29,10 @@ Additionally, the `bonus part` of the project has been implemented to extend the
 |  IRC Client 3  | <--------------> |                |
 +----------------+                   +----------------+
 ```
-- Server listens on a specified port and manages all client connections.  
+- The server listens on a specified port and manages incoming TCP connections.  
 - Each client connects via TCP sockets and can send commands/messages.  
-- Server handles multiple clients simultaneously.  
+- The server manages multiple clients simultaneously using `poll()`.  
+- Bonus file transfers are handled through additional sockets and a server-side DCC proxy.
 
 ## 💡 Features
 
@@ -51,21 +52,21 @@ Additionally, the `bonus part` of the project has been implemented to extend the
 
 ## 🖥️ Supported IRC Commands
 - `NICK`: NICK command is used to give user a nickname or change the existing one.
-- `USER`: The USER command is used at the beginning of connection to specify the username, hostname and realname of a new user.
+- `USER`: The USER command is used during connection setup to provide the username and real name of a new client.
 - `JOIN`: The JOIN command is used by a user to request to start listening to the specific channel.
 - `PRIVMSG`: PRIVMSG is used to send private messages between users, as well as to send messages to channels.
 - `KICK`: The KICK command can be used to request the forced removal of a user from a channel.
 - `INVITE`: The INVITE command allows a channel operator to invite another user to a channel, especially when the channel is set to invite-only mode.
 - `TOPIC`: The TOPIC command is used to change or view the topic of a channel.
-- `MODE`: The user MODE's are typically changes which affect either how the client is seen by others or what 'extra' messages the client is sent.
+- `MODE`: The MODE command is used to manage channel modes and permissions, such as invite-only access, topic restrictions, passwords, user limits, and operator privileges.
 - `PART`: The PART command causes the user sending the message to be removed from the list of active members for all given channels listed in the parameter string.
 - `PASS`: The PASS command is used to set a 'connection password'.
 - `CAP`: The CAP command is used to manage the IRC client’s capabilities.
 - `PING`: The PING command is used to check that the connection is still active, and the server responds to prevent the client from disconnecting due to timeout.
 - `PONG`: The PONG command is the response to a PING, and it is used to confirm that the client is still connected and to keep the connection alive.
 - `QUIT`: A client session is terminated with a quit message.
-- `DCC SEND`: The DCC SEND command is used to send a file to another user.
-- `DCC GET`: The DCC GET command is used to receive a file from another user.
+- `DCC SEND`: The DCC SEND command is used to initiate a file transfer between users.
+- `DCC GET`: The DCC GET is used to receive a file from another user via the DCC (Direct Client-to-Client) protocol.
 
 ## ⚙️ Instructions
 
@@ -94,21 +95,21 @@ To start the Server, use:
 ./ircserv <port> <password>
 ```
 - `port`: The port number on which your IRC server will be listening to for incoming IRC connections.
-- `password`: The connection password. It will be needed by any IRC client that tries to connect to your server. 
+- `password`: The password required for clients to connect and authenticate with the server.
 
 ### Connecting to the Server
 You can connect to the server using a terminal-based client such as `netcat` or a standard IRC client such as `Irssi`.
 
 #### Using netcat:
 ```bash
-nc <IP ADDRESS> <PORT>
+nc <IP_address> <port>
 ```
 #### Using irssi:
 ```bash
-irssi -c <IP_ADDRESS> -p <PORT>
+irssi -c <ip_address> -p <port>
 ```
-- `IP ADDRESS`: Host IP address.
-- `PORT`: The PORT that the server listening on.
+- `IP_address`: The IP address of the host running the server.
+- `port`: The port on which the server is listening.
 
 ### Initial Authentication (IRC protocol)
 
