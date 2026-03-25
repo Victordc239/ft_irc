@@ -3,7 +3,7 @@
 # ft_irc
 
 ## 📝 Description 
-`ft_irc` is a C++ project that implements a fully functional IRC server following the IRC (Internet Relay Chat) protocol.  
+`ft_irc` is a C++ project that implements a functional IRC server following the IRC (Internet Relay Chat) protocol.  
 
 This project allows multiple clients to connect to the server, join channels, send private and public messages, and interact in real time, effectively simulating the behavior of a real IRC server. The server is built using TCP sockets and handles multiple clients using I/O multiplexing.
 
@@ -13,14 +13,14 @@ The project’s main goals are:
 - Understand and implement the IRC protocol.
 - Manage channels, nicknames, and messaging (both public and private).
 
-The purpose of this project is to gain hands-on experience with network programming, socket management, and real-time communication by building a working IRC system from scratch.  
+The purpose of this project is to gain hands-on experience with network programming, socket management, and real-time communication by building a working IRC server from scratch.  
 
 Additionally, the `bonus part` of the project has been implemented to extend the server’s functionality and make it closer to a real IRC server. These extra features include:
-- File transfer management between clients.  
+- File transfer support between clients.  
 - Implementation of a bot to automate interactions and responses. 
 
 ## 🌐 Architecture Overview
-```
+```text
 +----------------+        TCP        +----------------+
 |  IRC Client 1  | <--------------> |                |
 +----------------+                   |                |
@@ -43,7 +43,7 @@ Additionally, the `bonus part` of the project has been implemented to extend the
 - Password-protected server access  
 - Graceful handling of client disconnections  
 - Command parsing following IRC standards
-- Support for core IRC commands (NICK, USER, JOIN, PRIVMSG, KICK, INVITE, TOPIC, MODE, PART, PASS, CAP, PING, PONG, QUIT, DCC SEND, DCC GET)
+- Support for core IRC commands (NICK, USER, JOIN, PRIVMSG, KICK, INVITE, TOPIC, MODE, PART, PASS, CAP, PING, PONG, QUIT)
 
 ### Bonus Part
 - File transfer between clients using DCC (DCC SEND / DCC GET)  
@@ -97,23 +97,22 @@ To start the Server, use:
 - `password`: The connection password. It will be needed by any IRC client that tries to connect to your server. 
 
 ### Connecting to the Server
-To connect to the server, you can use:
+You can connect to the server using a terminal-based client such as `netcat` or a standard IRC client such as `Irssi`.
 
-Using netcat:
+#### Using netcat:
 ```bash
 nc <IP ADDRESS> <PORT>
 ```
-Using irssi:
+#### Using irssi:
 ```bash
 irssi -c <IP_ADDRESS> -p <PORT>
 ```
 - `IP ADDRESS`: Host IP address.
 - `PORT`: The PORT that the server listening on.
-You can also use the Irssi IRC client.
 
 ### Initial Authentication (IRC protocol)
 
-```
+```text
 PASS <password>
 NICK your_nickname
 USER your_username
