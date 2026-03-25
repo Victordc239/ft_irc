@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 18:40:42 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/25 16:48:29 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -675,7 +675,7 @@ void Server::processPrivmsgCommand(int clientFd, const std::string &target, cons
 		{
 			// Delegate toda la lógica DCC / FileTransfer a la función auxiliar.
 			// La función devuelve true si se interceptó y manejó (incluye todos los fallbacks/NOTICEs)
-			if (handleDccSendInPrivmsg(clientFd, dst_fd, text, prefix, target))
+			if (handleDccSend(clientFd, dst_fd, text, prefix, target))
 				return; // ya manejado (interceptado o fallback)
 		}
 	}

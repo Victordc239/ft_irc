@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 18:21:29 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/25 16:49:12 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -140,7 +140,7 @@ void Server::sendNumericMessage(int fd, const std::string &msg)
 		std::cerr << "WARNING: client fd " << fd << " exceeded 1MB (" << (out.size() + full.size()) << " bytes). Disconnecting.\n";
 
 		// Limpiar transferencias que referencien a este cliente (si aplica)
-		cleanupTransfersForClient(fd);
+		cleanupClientTransfers(fd);
 
 		// Cerrar y eliminar cliente de estructuras
 		close(fd);
@@ -518,7 +518,7 @@ bool Server::handleClientEvent(size_t i)
 		int closedFd = clientFd;
 		std::cout << "Cliente (fd " << closedFd << ") cerró conexión\n";
 
-		cleanupTransfersForClient(closedFd); // Limpiar transfers que referencien este cliente como sender/receiver
+		cleanupClientTransfers(closedFd); // Limpiar transfers que referencien este cliente como sender/receiver
 
 		close(closedFd); // ahora cerrar y borrar cliente
 		_clients.erase(closedFd);
@@ -533,7 +533,7 @@ bool Server::handleClientEvent(size_t i)
 			std::cerr << "ERROR: recv falló\n";
 			int bad = clientFd;
 
-			cleanupTransfersForClient(bad); // limpiar transfers asociados
+			cleanupClientTransfers(bad); // limpiar transfers asociados
 
 			close(clientFd); // cerrar el cliente problemático
 			_clients.erase(clientFd);
@@ -584,7 +584,7 @@ int Server::runServerLoop()
 					g_running = 0;
 					break;
 				}
-				cleanupTransfersForClient(badfd); // Antes de cerrar, limpiar transfers que referencien este cliente como sender/receiver
+				cleanupClientTransfers(badfd); // Antes de cerrar, limpiar transfers que referencien este cliente como sender/receiver
 
 				// Ahora cerramos y borramos el cliente (como antes)
 				std::cout << "Cliente (fd " << badfd << ") se desconectó/err\n";
@@ -665,7 +665,7 @@ int Server::runServerLoop()
 						_clients.erase(badfd);
 						_fdToTransferId.erase(badfd);
 						
-						cleanupTransfersForClient(badfd); // limpiar transfers relacionados (igual que antes)
+						cleanupClientTransfers(badfd); // limpiar transfers relacionados (igual que antes)
 
 						// quitar entrada de _fds correspondiente al cliente (ya cerrada arriba)
 						_fds.erase(_fds.begin() + i);

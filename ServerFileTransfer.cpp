@@ -6,13 +6,14 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 14:14:47 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/25 16:14:55 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/25 16:49:12 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-/* Pequeños helpers internos para no repetir código */
+// Pequeños helpers internos para no repetir código 
+// Elimina de la lista de poll el descriptor de archivo indicado si lo encuentra
 void	Server::removePollFd(std::vector<struct pollfd> &fds, int fd)
 {
 	size_t i = 0;
@@ -27,6 +28,7 @@ void	Server::removePollFd(std::vector<struct pollfd> &fds, int fd)
 	}
 }
 
+// Actualiza los eventos (POLLIN, POLLOUT, etc.) que poll debe vigilar para un descriptor concreto
 void	Server::setPollEvents(std::vector<struct pollfd> &fds, int fd, short events)
 {
 	size_t i = 0;
@@ -41,7 +43,9 @@ void	Server::setPollEvents(std::vector<struct pollfd> &fds, int fd, short events
 	}
 }
 
-bool	Server::flushBufferToFd(std::vector<struct pollfd> &fds, FileTransfer &ft, std::string &buffer, int dst, bool countBytes)
+// Intenta enviar al destino todo el contenido de un buffer, actualizando el estado de la transferencia si hace falta
+// Envía los datos pendientes de un buffer a un socket y ajusta los eventos de escritura según sea necesario
+bool	Server::sendBuffer(std::vector<struct pollfd> &fds, FileTransfer &ft, std::string &buffer, int dst, bool countBytes)
 {
 	if (dst == -1)
 		return (true);
@@ -67,12 +71,13 @@ bool	Server::flushBufferToFd(std::vector<struct pollfd> &fds, FileTransfer &ft, 
 			return (false);
 		}
 	}
-
 	// Si el buffer ya quedó vacío, quitamos POLLOUT del destino
 	setPollEvents(fds, dst, POLLIN);
 	return (true);
 }
 
+// Detecta si el fd actual pertenece a una transferencia de archivos y, si es así, procesa su evento correspondiente
+// Gestiona los eventos principales de una transferencia de archivos si el fd actual forma parte de ella
 bool Server::handleFileTransferEvent(size_t &i)
 {
 	// --- Manejo de fds asociados a FileTransfer ---
@@ -138,7 +143,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 
 						if (!ft.buf_peer_to_remote.empty())
 						{
-							if (!flushBufferToFd(_fds, ft, ft.buf_peer_to_remote, ft.receiverFdRedDDC, true))
+							if (!sendBuffer(_fds, ft, ft.buf_peer_to_remote, ft.receiverFdRedDDC, true))
 								ft.closeTransferSockets();
 						}
 
@@ -184,7 +189,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 
 			if (ft.receiverFdRedDDC != -1 && !ft.buf_peer_to_remote.empty())
 			{
-				if (!flushBufferToFd(_fds, ft, ft.buf_peer_to_remote, ft.receiverFdRedDDC, true))
+				if (!sendBuffer(_fds, ft, ft.buf_peer_to_remote, ft.receiverFdRedDDC, true))
 					ft.closeTransferSockets();
 			}
 
@@ -193,13 +198,15 @@ bool Server::handleFileTransferEvent(size_t &i)
 		}
 
 		// 👉 Delegamos TODO lo demás a la auxiliar
-		if (handleFileTransferEventAux(i, curFd, tid))
+		if (handleFileTransferDataEvent(i, curFd, tid))
 			return (true);
 	}
 	return (false);
 }
 
-bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
+// Procesa la lectura, escritura y limpieza de una transferencia de archivos ya identificada
+// Se encarga de mover datos entre sockets y limpiar la transferencia cuando termina o falla
+bool Server::handleFileTransferDataEvent(size_t &i, int curFd, unsigned long tid)
 {
 	std::map<unsigned long, FileTransfer>::iterator itft = _transfers.find(tid);
 	if (itft == _transfers.end())
@@ -245,7 +252,7 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 					countBytes = true;
 				else
 					countBytes = false;
-				if (!flushBufferToFd(_fds, ft, *outBuffer, dst, countBytes))
+				if (!sendBuffer(_fds, ft, *outBuffer, dst, countBytes))
 					ft.closeTransferSockets();
 			}
 		}
@@ -285,7 +292,7 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 		else
 			countBytes = true;
 
-		if (!flushBufferToFd(_fds, ft, *outBuffer, curFd, countBytes))
+		if (!sendBuffer(_fds, ft, *outBuffer, curFd, countBytes))
 			ft.closeTransferSockets();
 
 		if (outBuffer->empty())
@@ -317,7 +324,9 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 	return (false);
 }
 
-bool	parseDccIpToken(const std::string &tok, struct in_addr &out)
+// Convierte una IP de DCC, ya sea en formato decimal o con puntos, a una dirección IP válida
+// Interpreta una IP enviada en un DCC y la transforma en un formato usable por el socket
+bool	parseDccIp(const std::string &tok, struct in_addr &out)
 {
 	// Caso 1: IP decimal estilo DCC (ej: 2130706433)
 	char *endptr = NULL;
@@ -336,7 +345,9 @@ bool	parseDccIpToken(const std::string &tok, struct in_addr &out)
 	return (true);
 }
 
-bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std::vector<std::string> &toks, const std::string &prefix, const std::string &target, const std::string &filename, unsigned long fsize, unsigned long transferId)
+// Configura el proxy DCC conectando con el emisor original y enviando al receptor la IP y puerto del proxy
+// Prepara la transferencia DCC para que el receptor se conecte al proxy en lugar de hacerlo directamente al emisor
+bool Server::handleDccSendProxy(int clientFd, int dst_fd, const std::vector<std::string> &toks, const std::string &prefix, const std::string &target, const std::string &filename, unsigned long fsize, unsigned long transferId)
 {
 	// Intentar conectar de forma activa al sender ORIGINAL (si el CTCP incluía IP y PORT). Muchos clientes (el emisor) están en modo "listen" y
 	// esperan que el receptor conecte a ellos. Si queremos recibir bytes en el proxy, debemos conectarnos al sender usando la IP/PORT que nos mandó.
@@ -353,7 +364,7 @@ bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std:
 		bool haveSenderAddr = false;
 
 		struct in_addr ina;
-		if (parseDccIpToken(orig_ip_tok, ina))
+		if (parseDccIp(orig_ip_tok, ina))
 		{
 			sender_addr.sin_addr = ina;
 			haveSenderAddr = true;
@@ -414,7 +425,6 @@ bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std:
 		else
 			sendNumericMessage(clientFd, ":ircserv NOTICE :DCC proxy couldn't parse sender address from CTCP; proxy will wait for incoming connections");
 	}
-
 	// Obtener IP del servidor para enviar al receptor (si no se puede, usar 127.0.0.1)
 	// NOTA: no usar getsockname(_server_fd) cuando _server_fd está ligado a INADDR_ANY,
 	// porque devolvería 0.0.0.0. En su lugar intentamos averiguar la IP saliente
@@ -443,11 +453,9 @@ bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std:
 		}
 		close(sock);
 	}
-
 	// Convertir IP (dotted) a entero decimal que usa DCC (ntohl(inet_addr(ip)))
 	uint32_t ip_net = inet_addr(serverIp.c_str()); // network order
 	uint32_t ip_decimal = ntohl(ip_net);          // host order decimal
-
 	// Construir el CTCP DCC SEND modificado para el receptor (le decimos que se conecte al servidor)
 	unsigned short port = _transfers[transferId].getListenerPort();
 	if (port == 0)
@@ -456,14 +464,11 @@ bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std:
 		sendNumericMessage(clientFd, ":ircserv NOTICE :DCC proxy internal error (listener port=0)");
 		return (true);
 	}
-
 	// Formato clásico DCC: IP en decimal (host order) y puerto en decimal.
 	std::string dccmsg = "\001DCC SEND " + filename + " " + convertIntToString((int)ip_decimal) + " " + convertIntToString((int)port) + " " + convertIntToString((int)fsize) + "\001";
 	std::string outmsg = ":" + prefix + " PRIVMSG " + target + " :" + dccmsg;
-
 	// Enviar al receptor el CTCP con IP/puerto del proxy
 	sendNumericMessage(dst_fd, outmsg);
-
 	// Informar al emisor (opcional, mensaje NOTICE)
 	std::string senderNick = _clients[clientFd].nickname;
 	if (senderNick.empty())
@@ -473,7 +478,9 @@ bool Server::handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std:
 	return (true);
 }
 
-bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string &text, const std::string &prefix, const std::string &target)
+// Detecta un DCC SEND dentro de un PRIVMSG, crea la transferencia y la redirige a través del proxy
+// Intercepta un envío DCC, crea la transferencia y prepara el proxy para gestionarla
+bool Server::handleDccSend(int clientFd, int dst_fd, const std::string &text, const std::string &prefix, const std::string &target)
 {
 	// Si el texto comienza con 0x01 (CTCP) y contiene "DCC SEND " en la posición 1, lo consideramos una petición DCC SEND que podemos interceptar.
 	// (esta función asume que ya comprobaste que text[0] == '\001' y que text.find("DCC SEND ",1) == 1)
@@ -510,7 +517,6 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 		toks.push_back(s.substr(0, p));
 		s.erase(0, p + 1);
 	}
-
 	// Esperamos al menos el filename (toks[0]). ip/port/size son opcionales
 	if (!toks.empty())
 	{
@@ -575,7 +581,7 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 		// Mapear el fd del listener a la transferencia
 		_fdToTransferId[lfd] = ft.id;
 
-		bool result = handleDccSendInPrivmsgDccProxy(clientFd, dst_fd, toks, prefix, target, filename, fsize, ft.id);
+		bool result = handleDccSendProxy(clientFd, dst_fd, toks, prefix, target, filename, fsize, ft.id);
 		return (result);
 	}
 
@@ -584,10 +590,11 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 }
 
 //  Limpia todas las transfers que referencien al cliente badfd.
-//    Esta lógica estaba duplicada varias veces en runServerLoop; la centralizamos aquí.
-//    NOTA: conserva exactamente los mismos pasos que antes: closeTransferSockets(), borrar mappings,
-//    borrar fds del vector _fds, y eliminar las entradas de _transfers.
-void Server::cleanupTransfersForClient(int badfd)
+//  Esta lógica estaba duplicada varias veces en runServerLoop; la centralizamos aquí.
+//  NOTA: conserva exactamente los mismos pasos que antes: closeTransferSockets(), borrar mappings, borrar fds del vector _fds, y eliminar las entradas de _transfers.
+// Cierra y elimina todas las transferencias de archivos asociadas a un cliente desconectado o inválido
+// Limpia todas las transferencias relacionadas con un cliente cuando deja de estar disponible
+void Server::cleanupClientTransfers(int badfd)
 {
 	// Limpiar transfers que referencien este cliente como sender/receiver
 	std::vector<unsigned long> toEraseTids;
@@ -633,7 +640,6 @@ void Server::cleanupTransfersForClient(int badfd)
 		}
 		++ittr;
 	}
-
 	// borrar transfers recogidos
 	size_t x = 0;
 	while (x < toEraseTids.size())

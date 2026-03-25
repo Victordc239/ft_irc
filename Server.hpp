@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 17:26:00 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/25 16:49:12 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,8 +60,8 @@ class Server
 		void	handlePartCommand(int clientFd, const std::string &line);
 		void	handlePrivmsgCommand(int clientFd, const std::string &line);
 		void	processPrivmsgCommand(int clientFd, const std::string &target, const std::string &text, const std::string &prefix, const std::string &nick);
-		bool	handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string &text, const std::string &prefix, const std::string &target);
-		bool	handleDccSendInPrivmsgDccProxy(int clientFd, int dst_fd, const std::vector<std::string> &toks, const std::string &prefix, const std::string &target, const std::string &filename, unsigned long fsize, unsigned long transferId);
+		bool	handleDccSend(int clientFd, int dst_fd, const std::string &text, const std::string &prefix, const std::string &target);
+		bool	handleDccSendProxy(int clientFd, int dst_fd, const std::vector<std::string> &toks, const std::string &prefix, const std::string &target, const std::string &filename, unsigned long fsize, unsigned long transferId);
 		void	handleKickCommand(int clientFd, const std::string &line);
 		void	handleInviteCommand(int clientFd, const std::string &line);
 		void	handleTopicCommand(int clientFd, const std::string &line);
@@ -74,11 +74,11 @@ class Server
 		void	mode_l(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &param, const std::string &prefix);
 		void	mode_user(int clientFd, const std::string &target, const std::string &rest);
 		bool	handleFileTransferEvent(size_t &i);
-		bool	handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid);
-		bool	flushBufferToFd(std::vector<struct pollfd> &fds, FileTransfer &ft, std::string &buffer, int dst, bool countBytes);
+		bool	handleFileTransferDataEvent(size_t &i, int curFd, unsigned long tid);
+		bool	sendBuffer(std::vector<struct pollfd> &fds, FileTransfer &ft, std::string &buffer, int dst, bool countBytes);
 		void	setPollEvents(std::vector<struct pollfd> &fds, int fd, short events);
 		void	removePollFd(std::vector<struct pollfd> &fds, int fd);
-		void	cleanupTransfersForClient(int badfd);
+		void	cleanupClientTransfers(int badfd);
 
 	public:
 		Server();
@@ -95,7 +95,7 @@ class Server
 
 std::string	convertIntToString(int n);
 long		ft_strtol(const char *str, char **endptr);
-bool		parseDccIpToken(const std::string &tok, struct in_addr &out);
+bool		parseDccIp(const std::string &tok, struct in_addr &out);
 
 
 #endif
