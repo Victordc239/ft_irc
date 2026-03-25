@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 14:14:47 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 17:48:37 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/25 16:14:55 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -139,7 +139,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 						if (!ft.buf_peer_to_remote.empty())
 						{
 							if (!flushBufferToFd(_fds, ft, ft.buf_peer_to_remote, ft.receiverFdRedDDC, true))
-								ft.closeAll();
+								ft.closeTransferSockets();
 						}
 
 						if (_clients.find(ft.senderFd) != _clients.end())
@@ -174,7 +174,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 			if (detectErr != 0)
 			{
 				std::cerr << "ERROR: ft id=" << ft.id << " sender connect failed\n";
-				ft.closeAll();
+				ft.closeTransferSockets();
 				++i;
 				return (true);
 			}
@@ -185,7 +185,7 @@ bool Server::handleFileTransferEvent(size_t &i)
 			if (ft.receiverFdRedDDC != -1 && !ft.buf_peer_to_remote.empty())
 			{
 				if (!flushBufferToFd(_fds, ft, ft.buf_peer_to_remote, ft.receiverFdRedDDC, true))
-					ft.closeAll();
+					ft.closeTransferSockets();
 			}
 
 			++i;
@@ -246,7 +246,7 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 				else
 					countBytes = false;
 				if (!flushBufferToFd(_fds, ft, *outBuffer, dst, countBytes))
-					ft.closeAll();
+					ft.closeTransferSockets();
 			}
 		}
 		else if (rn == 0)
@@ -261,11 +261,11 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 			else
 			{
 				ft.receiverClosed = true;
-				ft.closeAll();
+				ft.closeTransferSockets();
 			}
 		}
 		else if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
-			ft.closeAll();
+			ft.closeTransferSockets();
 		++i;
 		return (true);
 	}
@@ -286,7 +286,7 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 			countBytes = true;
 
 		if (!flushBufferToFd(_fds, ft, *outBuffer, curFd, countBytes))
-			ft.closeAll();
+			ft.closeTransferSockets();
 
 		if (outBuffer->empty())
 			setPollEvents(_fds, curFd, POLLIN);
@@ -295,7 +295,7 @@ bool Server::handleFileTransferEventAux(size_t &i, int curFd, unsigned long tid)
 	}
 
 	// 5) Cleanup
-	if (!ft.isActive())
+	if (!ft.isTransferActive())
 	{
 		size_t k = 0;
 		while (k < _fds.size())
@@ -585,7 +585,7 @@ bool Server::handleDccSendInPrivmsg(int clientFd, int dst_fd, const std::string 
 
 //  Limpia todas las transfers que referencien al cliente badfd.
 //    Esta lógica estaba duplicada varias veces en runServerLoop; la centralizamos aquí.
-//    NOTA: conserva exactamente los mismos pasos que antes: closeAll(), borrar mappings,
+//    NOTA: conserva exactamente los mismos pasos que antes: closeTransferSockets(), borrar mappings,
 //    borrar fds del vector _fds, y eliminar las entradas de _transfers.
 void Server::cleanupTransfersForClient(int badfd)
 {
@@ -598,13 +598,13 @@ void Server::cleanupTransfersForClient(int badfd)
 		FileTransfer &cand = ittr->second;
 		if (cand.senderFd == badfd || cand.receiverFd == badfd)
 		{
-			// capturar fds previo al closeAll
+			// capturar fds previo al closeTransferSockets
 			int lfd = cand.socketFileTransfer;
 			int pfd = cand.senderFdRedDDC;
 			int rfd = cand.receiverFdRedDDC;
 
 			// cerrar recursos
-			cand.closeAll();
+			cand.closeTransferSockets();
 
 			// borrar mappings por seguridad
 			if (lfd != -1) 

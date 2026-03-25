@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/23 14:45:31 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/25 16:14:55 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -61,7 +61,7 @@ FileTransfer &FileTransfer::operator=(const FileTransfer &other)
 	if (this != &other)
 	{
 		// cerrar recursos propios (si existían) antes de reasignar metadata
-		closeAll();
+		closeTransferSockets();
 
 		id = other.id;
 		senderFd = other.senderFd;
@@ -87,10 +87,11 @@ FileTransfer &FileTransfer::operator=(const FileTransfer &other)
 
 FileTransfer::~FileTransfer()
 {
-	closeAll();
+	closeTransferSockets();
 }
 
-int FileTransfer::setNonBlockinging(int fd)
+// Configura un socket para que no se quede bloqueado esperando datos o conexiones
+int FileTransfer::setNonBlocking(int fd)
 {
 	// int flags = fcntl(fd, F_GETFL, 0);
 	// if (flags == -1)
@@ -104,7 +105,8 @@ int FileTransfer::setNonBlockinging(int fd)
 	return (0);
 }
 
-// Crear listener para el proxy DCC
+// Crear listener para el proxy DCC.
+// Crea y prepara un socket servidor que escucha conexiones para iniciar una transferencia DCC
 int FileTransfer::createListener()
 {
 	if (socketFileTransfer != -1)
@@ -122,7 +124,7 @@ int FileTransfer::createListener()
 	// socketFileTransfer=socket, SOL_SOCKET=aplica a todo el socket(no solo al puerto o ip o protocolo),
 	// SO_REUSEADDR=permite reusar ip y puerto, &opt=activarlo, sizeof(opt)=tamaño valor
 
-	if (setNonBlockinging(socketFileTransfer) == -1)
+	if (setNonBlocking(socketFileTransfer) == -1)
 	{
 		close(socketFileTransfer);
 		socketFileTransfer = -1;
@@ -153,10 +155,10 @@ int FileTransfer::createListener()
 	startedAt = time(NULL);
 	lastActivity = startedAt;
 
-	return 0;
+	return (0);
 }
 
-// Obtener puerto asignado
+// Obtener puerto asignado. Devuelve el puerto que está usando el socket de escucha de la transferencia
 unsigned short FileTransfer::getListenerPort() const
 {
 	if (socketFileTransfer < 0)
@@ -171,8 +173,8 @@ unsigned short FileTransfer::getListenerPort() const
 	return (ntohs(addr.sin_port)); //ntohs devuelve el puerto que usa el cliente cuando se conecta al servidor
 }
 
-// Cerrar todos los sockets propietarios de la transferencia
-void FileTransfer::closeAll()
+// Cerrar todos los sockets propietarios de la transferencia y la marca como terminada
+void FileTransfer::closeTransferSockets()
 {
 	if (socketFileTransfer != -1)
 	{
@@ -201,8 +203,8 @@ void FileTransfer::closeAll()
 	finished = true;
 }
 
-// Saber si sigue activa
-bool FileTransfer::isActive() const
+// Comprueba si la transferencia sigue activa o si ya ha finalizado
+bool FileTransfer::isTransferActive() const
 {
 	if (finished)
 		return (false);

@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:24 by victor            #+#    #+#             */
-/*   Updated: 2026/03/23 14:45:31 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/25 16:14:55 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -57,16 +57,16 @@ class FileTransfer
 		int createListener();
 
 		// Cierra los sockets propios (listener, peer, remote) y marca finished=true
-		void closeAll();
+		void closeTransferSockets();
 
 		// Obtener puerto asignado al listener (0 si no hay listener)
 		unsigned short getListenerPort() const;
 
 		// True si aún está activo (no finished y al menos listener o sockets vivos)
-		bool isActive() const;
+		bool isTransferActive() const;
 
 	private:
-		int setNonBlockinging(int fd);
+		int setNonBlocking(int fd);
 };
 
 #endif
