@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/25 16:49:12 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/26 14:58:34 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,87 +39,6 @@ int Server::findFdByNick(const std::string &nick) const
 	}
 	return (-1);
 }
-
-// helper para enviar mensajes numéricos o líneas
-/* void Server::sendNumericMessage(int fd, const std::string &msg)
-{
-	// Si no conocemos el cliente, ignorar
-	if (_clients.find(fd) == _clients.end())
-		return;
-
-	// Construir la línea completa con CRLF y encolar
-	std::string full = msg + "\r\n";
-	std::string &out = _clients[fd].outBuffer;
-	out = out + full;
-
-	// Intentar enviar ahora mismo (non-blocking). Si se envía todo, no necesitamos POLLOUT.
-	if (!out.empty())
-	{
-		ssize_t s = send(fd, out.c_str(), out.size(), 0);
-		if (s > 0)
-			out.erase(0, s);
-		else if (s == -1 && (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR))
-		{
-			std::cerr << "ERROR sendNumericMessage: send() failed for fd " << fd << " errno=" << errno << " (" << strerror(errno) << ")\n";
-			// Manejo minimal: cerrar cliente aquí como haces en other places
-			close(fd);
-			_clients.erase(fd);
-			// quitar fd de _fds si quieres (opcional)
-			size_t kk = 0;
-			while (kk < _fds.size())
-			{
-				if (_fds[kk].fd == fd)
-				{
-					_fds.erase(_fds.begin() + kk);
-					break;
-				}
-				++kk;
-			}
-			return;
-		}
-	}
-
-	// Si aún queda algo por enviar, asegurarnos de monitorizar POLLOUT.
-	if (!out.empty())
-	{
-		bool found = false;
-		size_t j = 0;
-		while (j < _fds.size())
-		{
-			if (_fds[j].fd == fd)
-			{
-				_fds[j].events |= POLLOUT;
-				found = true;
-				break;
-			}
-			++j;
-		}
-
-		// Si no existe entrada en _fds para este fd (posible causa del bug), crearla.
-		if (!found)
-		{
-			pollfd p;
-			p.fd = fd;
-			p.events = POLLIN | POLLOUT; // queremos leer y escribir
-			p.revents = 0;
-			_fds.push_back(p);
-		}
-	}
-	else
-	{
-		// Si todo fue enviado, quitar POLLOUT si existe.
-		size_t j = 0;
-		while (j < _fds.size())
-		{
-			if (_fds[j].fd == fd)
-			{
-				_fds[j].events &= ~POLLOUT;
-				break;
-			}
-			++j;
-		}
-	}
-} */
 
 // Guarda y prepara mensajes numéricos formateados para enviarlos del servidor al cliente 
 void Server::sendNumericMessage(int fd, const std::string &msg)
