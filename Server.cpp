@@ -6,7 +6,7 @@
 /*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/26 14:58:34 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/26 15:08:18 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -181,11 +181,6 @@ Server::~Server()
 // o enviar mensajes. Con este modo, cada cliente puede enviar y recibir sin afectar a los demás.
 int Server::setNonBlocking(int fd)
 {
-	// int flags = fcntl(fd, F_GETFL, 0);
-	// if (flags == -1)
-	// 	return (-1);
-	// return (fcntl(fd, F_SETFL, flags | O_NONBLOCK));
-
 	if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
 		return (-1);
 	return (0);

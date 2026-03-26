@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   FileTransfer.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/25 16:14:55 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/26 15:08:09 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -93,13 +93,6 @@ FileTransfer::~FileTransfer()
 // Configura un socket para que no se quede bloqueado esperando datos o conexiones
 int FileTransfer::setNonBlocking(int fd)
 {
-	// int flags = fcntl(fd, F_GETFL, 0);
-	// if (flags == -1)
-	// 	return (-1);
-	// if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-	// 	return (-1);
-	// return (0);
-
 	if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
 		return (-1);
 	return (0);
