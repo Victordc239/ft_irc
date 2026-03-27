@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/25 16:49:12 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:44:57 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,7 +38,7 @@ class Server
 {
 	private:
 		int _server_fd;
-		std::vector<struct pollfd> _fds; // Estructura poll
+		std::vector<struct pollfd> _fds;
 		std::string _serverPassword;
 		static const size_t BUF_SIZE = 512;
 		char _buf[512];
@@ -46,7 +46,7 @@ class Server
 		std::map<std::string, Channel> _channels;
 		std::map<unsigned long, FileTransfer> _transfers;
 		unsigned long _nextTransferId;
-		std::map<int, unsigned long> _fdToTransferId; // fd -> transfer id
+		std::map<int, unsigned long> _fdToTransferId;
 		Bot _bot;
 
 		bool	isNickInUse(const std::string &nick) const;

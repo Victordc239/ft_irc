@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/09 14:39:18 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 18:40:25 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:54:35 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,7 +21,6 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 		return;
 	}
 
-	// extraer canal (primer token tras "KICK ")
 	size_t space = line.find(' ', prefix_len);
 	if (space == std::string::npos)
 	{
@@ -30,7 +29,6 @@ void	Server::handleKickCommand(int clientFd, const std::string &line)
 	}
 	std::string channelName = line.substr(prefix_len, space - prefix_len);
 
-	// trim simple de channelName (inicio/fin)
 	while (!channelName.empty() && (channelName[0] == ' ' || channelName[0] == '\t'))
 		channelName.erase(0, 1);
 	while (!channelName.empty() && (channelName[channelName.size() - 1] == ' ' || channelName[channelName.size() - 1] == '\t'))

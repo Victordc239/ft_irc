@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 15:06:23 by sofernan          #+#    #+#             */
-/*   Updated: 2026/03/23 15:00:15 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:29:27 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -53,7 +53,7 @@ std::string Bot::generateReply(const std::string &cmd, const std::string &nick)
 	{
 		time_t now = time(NULL);
 		std::string t = ctime(&now);
-		t.erase(t.size() - 1); // quita el '\n' final
+		t.erase(t.size() - 1); // remove the final '\n'
 		return ("Server time: " + t);
 	}
 	

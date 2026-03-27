@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:24 by victor            #+#    #+#             */
-/*   Updated: 2026/03/25 16:14:55 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:43:01 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,7 +24,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 
-/*al enviar un archivo creamos una nueva red que se llama DDC, entonces en ese mommento tenemos dos redes, una la IRC y otra que es DDC*/
+// al enviar un archivo creamos una nueva red que se llama DDC, entonces en ese mommento tenemos dos redes, una la IRC y otra que es DDC
 
 class FileTransfer
 {

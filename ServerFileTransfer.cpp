@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/16 14:14:47 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/25 16:49:12 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:54:22 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -530,7 +530,6 @@ bool Server::handleDccSend(int clientFd, int dst_fd, const std::string &text, co
 			if (*endptr != '\0')
 				fsize = 0; // parse error -> 0
 		}
-
 		// Construir la transferencia y crear listener (proxy)
 		FileTransfer ft;
 		ft.id = _nextTransferId++;

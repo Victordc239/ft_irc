@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/25 16:48:29 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:45:25 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,7 +38,6 @@ bool Server::handleAuthenticationCmds(size_t &i, const std::string &line)
 	{
 		// parse sencillo del subcomando tras "CAP "
 		std::string rest = line.substr(4);
-
 		// trim inicio (espacios/tabs)
 		size_t start = 0;
 		while (start < rest.size() && (rest[start] == ' ' || rest[start] == '\t'))

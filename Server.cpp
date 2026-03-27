@@ -3,16 +3,68 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/26 15:08:18 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/27 17:08:03 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-// Comprueba si un nick ya lo está usando algún cliente
+Server::Server()
+{
+	_server_fd = -1;
+	_serverPassword = "";
+	std::memset(_buf, 0, sizeof(_buf));
+	_nextTransferId = 1;
+}
+
+Server::Server(const Server &other)
+{
+	_server_fd = -1;
+	_serverPassword = other._serverPassword;
+	std::memcpy(_buf, other._buf, sizeof(_buf));
+	_nextTransferId = 1;
+	_fds.clear();
+	_clients.clear();
+}
+
+Server &Server::operator=(const Server &other)
+{
+	if (this == &other)
+		return (*this);
+	if (_server_fd != -1)
+	{
+		close(_server_fd);
+		_server_fd = -1;
+	}
+	size_t j = 0;
+	while (j < _fds.size())
+	{
+		close(_fds[j].fd);
+		++j;
+	}
+	_fds.clear();
+	_clients.clear();
+	_serverPassword = other._serverPassword;
+	std::memcpy(_buf, other._buf, sizeof(_buf));
+	return (*this);
+}
+
+Server::~Server()
+{
+	if (_server_fd != -1)
+		close(_server_fd);
+
+	size_t j = 0;
+	while (j < _fds.size())
+	{
+		close(_fds[j].fd);
+		++j;
+	}
+}
+
 bool Server::isNickInUse(const std::string &nick) const
 {
 	std::map<int, Client>::const_iterator iterator = _clients.begin();
@@ -26,7 +78,6 @@ bool Server::isNickInUse(const std::string &nick) const
 	return (false);
 }
 
-// Devuelve el fd (socket) de un cliente a partir de su nick
 int Server::findFdByNick(const std::string &nick) const
 {
 	std::map<int, Client>::const_iterator iterator = _clients.begin();
@@ -40,42 +91,32 @@ int Server::findFdByNick(const std::string &nick) const
 	return (-1);
 }
 
-// Guarda y prepara mensajes numéricos formateados para enviarlos del servidor al cliente 
+// Stores and prepares formatted numeric messages for sending from the server to the client
 void Server::sendNumericMessage(int fd, const std::string &msg)
 {
-	// Si no conocemos el cliente, ignorar
 	if (_clients.find(fd) == _clients.end())
 		return;
 
-	// Construir la línea completa con CRLF y encolar
 	std::string full = msg + "\r\n";
 	std::string &out = _clients[fd].outBuffer;
 
-	// --- Protección: no permitir crecimiento infinito del buffer ---
-	// Si el nuevo tamaño supera 1048576, desconectamos el cliente para
-	// evitar OOM y comportamiento indefinido bajo flood.
 	if (out.size() + full.size() > 1048576)
 	{
 		std::cerr << "WARNING: client fd " << fd << " exceeded 1MB (" << (out.size() + full.size()) << " bytes). Disconnecting.\n";
 
-		// Limpiar transferencias que referencien a este cliente (si aplica)
 		cleanupClientTransfers(fd);
 
-		// Cerrar y eliminar cliente de estructuras
 		close(fd);
 		_clients.erase(fd);
 		_fdToTransferId.erase(fd);
 
-		// Quitar fd de la lista de poll
 		removePollFd(_fds, fd);
 
 		return;
 	}
-
-	// Encolar el mensaje (NO intentar send() aquí)
+	
 	out = out + full;
 
-	// Si aún queda algo por enviar, asegurarnos de monitorizar POLLOUT.
 	if (!out.empty())
 	{
 		bool found = false;
@@ -91,19 +132,17 @@ void Server::sendNumericMessage(int fd, const std::string &msg)
 			++j;
 		}
 
-		// Si no existe entrada en _fds para este fd (posible causa del bug), crearla.
 		if (!found)
 		{
 			pollfd p;
 			p.fd = fd;
-			p.events = POLLIN | POLLOUT; // queremos leer y escribir
+			p.events = POLLIN | POLLOUT;
 			p.revents = 0;
 			_fds.push_back(p);
 		}
 	}
 	else
 	{
-		// Si todo fue enviado (caso raro porque acabamos de encolar), quitar POLLOUT si existe.
 		size_t j = 0;
 		while (j < _fds.size())
 		{
@@ -117,68 +156,7 @@ void Server::sendNumericMessage(int fd, const std::string &msg)
 	}
 }
 
-// Inicializa el servidor con valores por defecto
-Server::Server()
-{
-	_server_fd = -1;
-	_serverPassword = "";
-	std::memset(_buf, 0, sizeof(_buf));
-	_nextTransferId = 1;
-}
-
-// Crea una copia del servidor sin copiar conexiones activas
-Server::Server(const Server &other)
-{
-	_server_fd = -1;
-	_serverPassword = other._serverPassword;
-	std::memcpy(_buf, other._buf, sizeof(_buf));
-	_nextTransferId = 1;
-	_fds.clear();
-	_clients.clear();
-}
-
-// Copia un servidor en otro, cerrando antes conexiones existentes
-Server &Server::operator=(const Server &other)
-{
-	if (this == &other)
-		return (*this);
-	// Si tenemos un server_fd abierto, lo cerramos porque vamos a sobrescribir el objeto.
-	if (_server_fd != -1)
-	{
-		close(_server_fd);
-		_server_fd = -1;
-	}
-	// cerramos todos los fds monitorizados (si los hay)
-	size_t j = 0;
-	while (j < _fds.size())
-	{
-		close(_fds[j].fd);
-		++j;
-	}
-	_fds.clear();
-	_clients.clear();
-	_serverPassword = other._serverPassword;
-	std::memcpy(_buf, other._buf, sizeof(_buf));
-	return (*this);
-}
-
-// Cierra todos los sockets al destruir el servidor
-Server::~Server()
-{
-	if (_server_fd != -1)
-		close(_server_fd);
-
-	size_t j = 0;
-	while (j < _fds.size())
-	{
-		close(_fds[j].fd);
-		++j;
-	}
-}
-
-// Esta función configura el socket para que no sea bloqueante.
-// Por defecto, si un cliente no envía datos, podría bloquear a otros clientes que intentan conectarse
-// o enviar mensajes. Con este modo, cada cliente puede enviar y recibir sin afectar a los demás.
+// By default, if a client does not send data, it could block other clients from trying to connect or send messages
 int Server::setNonBlocking(int fd)
 {
 	if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
@@ -186,37 +164,31 @@ int Server::setNonBlocking(int fd)
 	return (0);
 }
 
-// Crea el socket del servidor, lo configura y empieza a escuchar conexiones
 bool Server::InitSocketAndListen(long port, const std::string &password)
 {
 	_serverPassword = password;
 
-	// Crear socket servidor que es el que escucha
-		_server_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET=IPV4, SOCK_STREAM=TCP, 0=protocolo por defecto
+	_server_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET = IPV4, SOCK_STREAM = TCP, 0 = default protocol
 	if (_server_fd == -1)
 	{
 		std::cerr << "ERROR: socket failure\n";
 		return (false);
 	}
 
-	std::cout << "Socket creado correctamente\n";
-
-	/*es para reusar el mismo puerto porque el kernel cuando cierras pone el puerto en time_wait y sin ello
-	no podrias usar el mismo puerto si cerramos el irc y lo volvemos a ejecutar acto seguido*/
+	std::cout << "Socket created successfully\n";
+	// Setsockopt allows the server to reuse the same port immediately after closing, 
+	// avoiding errors from the OS keeping the port in TIME_WAIT
 	int opt = 1;
 	if (setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1)
 	{
-		/*server_fd=socket, SOL_SOCKET=aplica a todo el socket(no solo al puerto o ip o protocolo),
-		SO_REUSEADDR=permite reusar ip y puerto, &opt=activarlo, sizeof(opt)=tamaño valor*/
-		std::cerr << "ERROR: setsockopt falló\n";
+		// server_fd = socket fd, SOL_SOCKET = the entire socket, SO_REUSEADDR = It allows you to reuse IP address and port, &opt = activate it
+		std::cerr << "ERROR: setsockopt failed\n";
 
-		// limpiar y salir: cerrar server_fd y cualquier otro fd abierto en _fds/_clients
 		if (_server_fd != -1)
 		{
 			close(_server_fd);
 			_server_fd = -1;
 		}
-		// por seguridad cerrar cualquier fd que pudiera haberse registrado antes (aunque normalmente _fds está vacío aquí)
 		size_t jj = 0;
 		while (jj < _fds.size())
 		{
@@ -228,11 +200,11 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 
 		return (false);
 	}
-	// Hacer socket no bloqueante
+	
 	if (Server::setNonBlocking(_server_fd) == -1)
 	{
-		std::cerr << "ERROR: no se pudo poner server_fd non-blocking\n";
-		// limpiar y salir: cerrar server_fd y cualquier otro fd abierto
+		std::cerr << "ERROR: The server could not be set to non-blocking\n";
+
 		if (_server_fd != -1)
 		{
 			close(_server_fd);
@@ -249,14 +221,14 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 
 		return (false);
 	}
-	// Dirección servidor
-	sockaddr_in server_addr; //estructura que ya existe para guardar ip y puerto del servidor
-	std::memset(&server_addr, 0, sizeof(server_addr)); //seteamos a 0 toda la estructura
+	
+	sockaddr_in server_addr; // guardar ip y puerto del servidor
+	std::memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = AF_INET; //IPv4
 	server_addr.sin_port = htons((uint16_t)port); //Conversion del numero del puerto en bits para que todos los ordenadores lo interpreten igual
-	server_addr.sin_addr.s_addr = INADDR_ANY; //cualquier adapator de red del ordenador, ethernet, wifi, localhost,...
+	server_addr.sin_addr.s_addr = INADDR_ANY; // adapator de red del ordenador, ethernet, wifi, localhost,...
 
-	if (bind(_server_fd, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) //le decimos a que puerto y ip esta asociado el socket
+	if (bind(_server_fd, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) // La función bind() en sockets sirve para asociar tu servidor a una dirección IP y a un puerto.
 	{
 		std::cerr << "ERROR: bind failure\n";
 		close(_server_fd);
@@ -264,7 +236,7 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 		return (false);
 	}
 
-	std::cout << "Bind hecho correctamente\n";
+	std::cout << "Bind done correctly\n";
 
 	if (listen(_server_fd, SOMAXCONN) == -1)
 	{
@@ -276,9 +248,8 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 		return (false);
 	}
 
-	std::cout << "Servidor escuchando...\n";
+	std::cout << "Server listening...\n";
 
-	// Estructura poll
 	pollfd pfd;
 	pfd.fd = _server_fd; //vigilar el servidor
 	pfd.events = POLLIN; //avisame cuando haya datos a leer
@@ -308,7 +279,7 @@ bool Server::handleClientEvent(size_t i)
 			if (!line.empty() && line[line.size() - 1] == '\r')
 				line.erase(line.size() - 1);
 
-			std::cout << "fd " << clientFd << " -> Línea recibida: [" << line << "]\n";
+			std::cout << "fd " << clientFd << " -> Line received: [" << line << "]\n";
 			if (!_clients[clientFd].registered)
 			{
 				// Siempre permitir PASS y CAP antes del registro
@@ -323,7 +294,7 @@ bool Server::handleClientEvent(size_t i)
 						|| line.compare(0, 5, "TOPIC") == 0 || line.compare(0, 4, "MODE") == 0 || line.compare(0, 4, "PART") == 0)
 				{
 					Client &client = _clients[clientFd];
-					std::cout << "fd " << clientFd << " intentó usar [" << line << "] sin registrarse. Falta: ";
+					std::cout << "fd " << clientFd << " tried to use [" << line << "] without registering. Falta: ";
 					if (!client.correctPass)
 						std::cout << "PASS ";
 					if (client.nickname.empty())
@@ -340,7 +311,7 @@ bool Server::handleClientEvent(size_t i)
 					_clients[clientFd].registered = true;
 					std::string welcome = "001 " + _clients[clientFd].nickname + " :Welcome to the simple IRCd";
 					sendNumericMessage(clientFd, welcome);
-					std::cout << "fd " << clientFd << " registrado (PASS+NICK+USER). Enviada 001.\n"; // enviar RPL_WELCOME (001)
+					std::cout << "fd " << clientFd << " registered (PASS+NICK+USER). Sent 001.\n"; // send RPL_WELCOME (001)
 				}
 			}
 			else
@@ -374,7 +345,7 @@ bool Server::handleClientEvent(size_t i)
 				{
 					std::string ping_target = line.substr(5);
 					sendNumericMessage(clientFd, "PONG " + ping_target);
-					std::cout << "fd " << clientFd << " -> Respondido PONG a [" << ping_target << "]\n";
+					std::cout << "fd " << clientFd << " -> Responds PONG to [" << ping_target << "]\n";
 				}
 				//una vez ya autorizado respondemos si nos ponen denuevo estos comandos de autorizacion
 				else if (line.compare(0, 5, "PASS ") == 0 || line.compare(0, 5, "USER ") == 0)
@@ -430,7 +401,7 @@ bool Server::handleClientEvent(size_t i)
 	else if (n == 0) // Cliente cerró conexión de forma ordenada -> limpiar también transfers relacionados
 	{
 		int closedFd = clientFd;
-		std::cout << "Cliente (fd " << closedFd << ") cerró conexión\n";
+		std::cout << "Client (fd " << closedFd << ") closed the connection\n";
 
 		cleanupClientTransfers(closedFd); // Limpiar transfers que referencien este cliente como sender/receiver
 
@@ -444,7 +415,7 @@ bool Server::handleClientEvent(size_t i)
 	{
 		if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
 		{
-			std::cerr << "ERROR: recv falló\n";
+			std::cerr << "ERROR: recv failed\n";
 			int bad = clientFd;
 
 			cleanupClientTransfers(bad); // limpiar transfers asociados
@@ -469,7 +440,7 @@ int Server::runServerLoop()
 		{
 			if (errno == EINTR)
 				continue;
-			std::cerr << "ERROR: poll falló\n";
+			std::cerr << "ERROR: poll failed\n";
 			break;
 		}
 		size_t i = 0;
@@ -494,14 +465,14 @@ int Server::runServerLoop()
 				// Si el fd es server_fd -> error crítico
 				if (badfd == _server_fd)
 				{
-					std::cerr << "ERROR en server_fd (poll)\n";
+					std::cerr << "ERROR in poll socket\n";
 					g_running = 0;
 					break;
 				}
 				cleanupClientTransfers(badfd); // Antes de cerrar, limpiar transfers que referencien este cliente como sender/receiver
 
 				// Ahora cerramos y borramos el cliente (como antes)
-				std::cout << "Cliente (fd " << badfd << ") se desconectó/err\n";
+				std::cout << "Client (fd " << badfd << ") disconnected/err\n";
 				close(badfd);
 				_clients.erase(badfd);
 				_fdToTransferId.erase(badfd);
@@ -519,12 +490,12 @@ int Server::runServerLoop()
 					{
 						if (errno == EAGAIN || errno == EWOULDBLOCK)
 							break;
-						std::cerr << "ERROR en accept nuevo cliente\n";
+						std::cerr << "ERROR in accept new client\n";
 						break;
 					}
 					if (Server::setNonBlocking(client_fd) == -1)
 					{
-						std::cerr << "WARNING: no se pudo poner client_fd non-blocking\n";
+						std::cerr << "WARNING: The client_fd could not be set to non-blocking\n";
 						close(client_fd);
 						break;
 					}
@@ -538,9 +509,9 @@ int Server::runServerLoop()
 
 					char client_ip[INET_ADDRSTRLEN]; //tamaño máximo para almacenar la representación en texto de una dirección IPv4
 					if (inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip)) == NULL)
-						std::cout << "Cliente conectado (fd " << client_fd << ") desde [ip desconocida]:" << ntohs(client_addr.sin_port) << "!\n"; 
+						std::cout << "Client connected (fd " << client_fd << ") from [unknown IP address]:" << ntohs(client_addr.sin_port) << "!\n"; 
 					else
-						std::cout << "Cliente conectado desde " << client_ip << ":" << ntohs(client_addr.sin_port) << " (fd " << client_fd << ")\n";
+						std::cout << "Client connected from " << client_ip << ":" << ntohs(client_addr.sin_port) << " (fd " << client_fd << ")\n";
 				}
 				++i;
 				continue;
@@ -572,7 +543,7 @@ int Server::runServerLoop()
 						break;
 					else
 					{
-						std::cerr << "ERROR: send falló\n";
+						std::cerr << "ERROR: send failed\n";
 						// cerrar el cliente y limpiar transfers relacionados
 						int badfd = fd;
 						close(badfd);

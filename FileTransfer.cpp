@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   FileTransfer.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/26 15:08:09 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/27 16:41:56 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,7 +60,6 @@ FileTransfer &FileTransfer::operator=(const FileTransfer &other)
 {
 	if (this != &other)
 	{
-		// cerrar recursos propios (si existían) antes de reasignar metadata
 		closeTransferSockets();
 
 		id = other.id;
@@ -90,7 +89,6 @@ FileTransfer::~FileTransfer()
 	closeTransferSockets();
 }
 
-// Configura un socket para que no se quede bloqueado esperando datos o conexiones
 int FileTransfer::setNonBlocking(int fd)
 {
 	if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)

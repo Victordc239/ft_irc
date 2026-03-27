@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 14:47:22 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 18:30:57 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:52:55 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,7 +14,6 @@
 
 void Server::mode_i(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &prefix)
 {
-	// solo operadores pueden cambiar opciones del canal
 	if (!channel.isClientOperator(clientFd))
 	{
 		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator");
@@ -75,7 +74,6 @@ void Server::mode_k(int clientFd, Channel &channel, const std::string &channelNa
 
 	if (plus)
 	{
-		// establecer key (param contiene la key)
 		channel.setKey(param);
 		std::string out = ":" + prefix + " MODE " + channelName + " +k " + param;
 
@@ -90,7 +88,6 @@ void Server::mode_k(int clientFd, Channel &channel, const std::string &channelNa
 	}
 	else
 	{
-		// quitar key
 		channel.removeKey();
 		std::string out = ":" + prefix + " MODE " + channelName + " -k";
 
@@ -107,7 +104,6 @@ void Server::mode_k(int clientFd, Channel &channel, const std::string &channelNa
 
 void Server::mode_o(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &targetNick, const std::string &prefix)
 {
-	// sólo operadores pueden dar/quitar operador
 	if (!channel.isClientOperator(clientFd))
 	{
 		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator");
@@ -160,7 +156,7 @@ void Server::mode_l(int clientFd, Channel &channel, const std::string &channelNa
 
 	if (plus)
 	{
-		// param debería ser número
+		// param should be number
 		const char *s = param.c_str();
 		char *endptr = NULL;
 		long v = ft_strtol(s, &endptr);
@@ -199,7 +195,6 @@ void Server::mode_l(int clientFd, Channel &channel, const std::string &channelNa
 
 void Server::mode_user(int clientFd, const std::string &target, const std::string &rest)
 {
-	// target debe ser el nick; solo el propio usuario puede cambiar sus UMODE
 	std::map<int, Client>::iterator itClient = _clients.find(clientFd);
 	if (itClient == _clients.end())
 		return;
@@ -211,29 +206,28 @@ void Server::mode_user(int clientFd, const std::string &target, const std::strin
 		sendNumericMessage(clientFd, "502 :Cannot change mode for other users");
 		return;
 	}
-	// extraer el token de modos (primer token de rest)
+	
 	std::string modes = rest;
-	// trim inicio
+
 	while (!modes.empty() && (modes[0] == ' ' || modes[0] == '\t'))
 		modes.erase(0, 1);
-	// si hay espacios, tomar sólo hasta el primero
+
 	size_t space = modes.find(' ');
 	if (space != std::string::npos)
 		modes = modes.substr(0, space);
-	// quitar CR final si existe
+
 	if (!modes.empty() && modes[modes.size() - 1] == '\r')
 		modes.erase(modes.size() - 1);
 
 	if (modes.empty())
 	{
-		// petición de ver modos del usuario: podemos devolver un echo simple
-		std::string reply = ":ircserv 221 " + myNick + " :User modes";
+		std::string reply = " :ircserv 221 " + myNick + " :User modes";
 		sendNumericMessage(clientFd, reply);
 		return;
 	}
 
 	bool plus = true;
-	std::string applied; // para construir el eco final (ej "+i" o "-i")
+	std::string applied; 
 	size_t i = 0;
 	while (i < modes.size())
 	{
@@ -256,11 +250,10 @@ void Server::mode_user(int clientFd, const std::string &target, const std::strin
 			_clients[clientFd].invisible = plus;
 
 			if (plus)
-				std::cout << "fd " << clientFd << " Usuario " << myNick << " ahora es invisible\n";
+				std::cout << "fd " << clientFd << " User " << myNick << " is now invisible\n";
 			else
-				std::cout << "fd " << clientFd << " Usuario " << myNick << " ya no es invisible\n";
+				std::cout << "fd " << clientFd << " User " << myNick << " is no longer invisible\n";
 
-			// añadir a applied; simplificamos: concatenamos +i/-i según corresponda
 			if (plus)
 				applied = applied + "+i";
 			else
@@ -272,7 +265,6 @@ void Server::mode_user(int clientFd, const std::string &target, const std::strin
 
 	if (!applied.empty())
 	{
-		// Enviar eco al propio cliente (y podrías notificar a otros según necesidades)
 		std::string echo = ":" + myNick + " MODE " + target + " " + applied;
 		sendNumericMessage(clientFd, echo);
 	}

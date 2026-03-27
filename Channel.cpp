@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:57 by victor            #+#    #+#             */
-/*   Updated: 2026/03/23 18:40:42 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:37:33 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -85,10 +85,9 @@ void Channel::addClient(int fd)
 void Channel::removeClient(int fd)
 {
 	clients.erase(fd);
-	// si era operador, quitarlo también
 	operators.erase(fd);
 }
-// Comprueba si un cliente (identificado por su fd) está dentro del canal, comprueba si existe en la lista de clientes
+
 bool Channel::isClientInChannel(int fd) const
 {
 	return (clients.find(fd) != clients.end());
@@ -104,13 +103,12 @@ void Channel::removeOperator(int fd)
 	operators.erase(fd);
 }
 
-// Comprueba si un cliente (por su fd) es operador del canal, comprueba si está en la lista de operadores
 bool Channel::isClientOperator(int fd) const
 {
 	return (operators.find(fd) != operators.end());
 }
 
-// setTopic guarda texto, quien lo puso (nickname) y la hora actual
+// Save the text, who posted it (nickname), and the current time
 void Channel::setTopic(const std::string &newTopic, const std::string &setter)
 {
 	topic = newTopic;
@@ -118,7 +116,6 @@ void Channel::setTopic(const std::string &newTopic, const std::string &setter)
 	topic_set_time = std::time(NULL);
 }
 
-// indica si hay topic (topic != "")
 bool Channel::hasTopic() const
 {
 	return !(topic.empty());
@@ -184,7 +181,6 @@ void Channel::removeUserLimit()
 	limit = 0;
 }
 
-// Comprueba si un cliente específico ha recibido una invitación para un canal
 bool Channel::isClientInvited(int fd) const
 {
 	return (invitedClients.find(fd) != invitedClients.end());

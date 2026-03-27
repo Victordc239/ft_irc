@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 16:21:40 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/23 17:35:30 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:55:00 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,7 +40,7 @@ long ft_strtol(const char *str, char **endptr)
 
 	const char *s = str;
 	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r' || *s == '\v' || *s == '\f')
-		s++; // saltar espacios iniciales
+		s++;
 
 	int sign = 1;
 	if (*s == '+')
@@ -64,7 +64,7 @@ long ft_strtol(const char *str, char **endptr)
 			else
 				result = LONG_MIN;
 			any_digit = true;
-			// consumir los dígitos restantes
+
 			while (*s >= '0' && *s <= '9')
 				s++;
 			break;
@@ -85,5 +85,3 @@ long ft_strtol(const char *str, char **endptr)
 
 	return (result * sign);
 }
-
-
