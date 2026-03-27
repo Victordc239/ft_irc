@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/27 16:45:25 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/27 17:17:14 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -109,7 +109,6 @@ void Server::handleNickCommand(int clientFd, const std::string &line)
 	if (isNickInUse(newnick))
 	{
 		// ERR_NICKNAMEINUSE 433
-		//    Formato recomendado: :<servername> 433 <yournick-or-*> <attemptednick> :Nickname is already in use
 		//    Usamos "ircserv" como servername por ahora.
 		std::string current = _clients[clientFd].nickname;
 		if (current.empty())
@@ -127,7 +126,7 @@ void Server::handleNickCommand(int clientFd, const std::string &line)
 // Registra el nombre de usuario del cliente con el comando USER
 void Server::handleUserCommand(int clientFd, const std::string &line)
 {
-	// FORMATO: USER <user> <mode> <unused> :<realname>
+	// USER <user> <mode> <unused> :<realname>
 	std::string rest = line.substr(5);
 	std::string user;
 	std::string realname;
@@ -165,7 +164,7 @@ void Server::handleUserCommand(int clientFd, const std::string &line)
 // Permite a un cliente unirse a un canal, creando el canal si no existe, validando permisos y claves
 void Server::handleJoinCommand(int clientFd, const std::string &line)
 {
-	// Formato esperado: "JOIN <#channel> [key]"
+	// "JOIN <#channel> [key]"
 	std::string rest;
 	if (line.size() > 5)
 		rest = line.substr(5);
@@ -347,7 +346,6 @@ void Server::sendJoinInfo(int clientFd, const std::string &nameChannel)
 
 	if (!modes.empty())
 	{
-		// Formato: :server 324 <nick> <channel> <modes> [params]
 		std::string reply = ":ircserv 324 " + nick + " " + nameChannel + " +" + modes + params;
 		sendNumericMessage(clientFd, reply);
 	}
@@ -504,7 +502,7 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 // Analiza un mensaje PRIVMSG recibido, extrae el destinatario y el texto, construye el prefijo del emisor y luego delega el envío y procesamiento real del mensaje
 void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 {
-	// Formato: "PRIVMSG <target> :<message>"
+	// "PRIVMSG <target> :<message>"
 	const size_t prefix_len = 8; // strlen("PRIVMSG ")
 	if (line.size() <= prefix_len)
 	{
