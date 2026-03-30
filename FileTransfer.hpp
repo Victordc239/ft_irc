@@ -3,14 +3,13 @@
 /*                                                        :::      ::::::::   */
 /*   FileTransfer.hpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:24 by victor            #+#    #+#             */
-/*   Updated: 2026/03/27 16:43:01 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/30 11:18:52 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-// FileTransfer.hpp
 #ifndef FILETRANSFER_HPP
 #define FILETRANSFER_HPP
 
@@ -24,45 +23,36 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 
-// al enviar un archivo creamos una nueva red que se llama DDC, entonces en ese mommento tenemos dos redes, una la IRC y otra que es DDC
-
 class FileTransfer
 {
 	public:
-		unsigned long id;		// id único (Server asigna)
-		int senderFd;		// fd del emisor (cliente que solicitó enviar)
-		int receiverFd;		// fd del receptor (cliente objetivo)
-		int socketFileTransfer;	// socket listening creado por el server (-1 si no)
-		int senderFdRedDDC;	// fd del cliente que envia cuando se conecta a la red DDC para la transferencia de archivos
-		int receiverFdRedDDC;		// fd del cliente que recibe cuando se conecta a la red DDC para la transferencia de archivos
+		unsigned long id;
+		int senderFd;
+		int receiverFd;
+		int socketFileTransfer;
+		int senderFdRedDDC;
+		int receiverFdRedDDC;
 		std::string filename;
 		unsigned long filesize;
 		unsigned long bytesTransferred;
-		std::string buf_peer_to_remote; /* buffers para reenvío */
-		std::string buf_remote_to_peer;  /* buffers para reenvío */
+		std::string buf_peer_to_remote;
+		std::string buf_remote_to_peer;
 		bool listenerCreated;
 		bool bothConnected;
 		bool finished;
-		bool senderClosed;		// sender DDC cerró su conexión
-		bool receiverClosed;		// receiver DDC cerró su conexión
-		time_t startedAt;	// timestamp de inicio
-		time_t lastActivity;	// ultimo timestamp
+		bool senderClosed;
+		bool receiverClosed;
+		time_t startedAt;
+		time_t lastActivity;
 
 		FileTransfer();
 		FileTransfer(const FileTransfer &other);
 		FileTransfer &operator=(const FileTransfer &other);
 		~FileTransfer();
 
-		// Crear listener en INADDR_ANY puerto 0 (ephemeral), devuelve 0 ok, -1 error
 		int createListener();
-
-		// Cierra los sockets propios (listener, peer, remote) y marca finished=true
 		void closeTransferSockets();
-
-		// Obtener puerto asignado al listener (0 si no hay listener)
 		unsigned short getListenerPort() const;
-
-		// True si aún está activo (no finished y al menos listener o sockets vivos)
 		bool isTransferActive() const;
 
 	private:

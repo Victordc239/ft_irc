@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Client.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:02 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/27 16:40:56 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/30 09:54:12 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,14 +19,14 @@ class Client
 {
 	public:
 		int fd;
-		std::string accumulator; // Acumulador para recibir todos los mensajes completos
-		std::string outBuffer;	// Buffer para enviar mensaje de servidor a cliente
-		bool correctPass;		// si ha autenticado correctamente
+		std::string accumulator;
+		std::string outBuffer;
+		bool correctPass;
 		std::string nickname;
 		std::string username;
-		std::string realname;	// parte después de ':' en USER ejemplo: [USER vdiez-cu vdiez-cu localhost :Victor Diez Cuesta]
-		bool registered;		// true cuando NICK+USER procesados
-		bool invisible;		// modo +i de usuario (invisible)
+		std::string realname;
+		bool registered;
+		bool invisible;
 
 		Client();
 		Client(int fd_client);

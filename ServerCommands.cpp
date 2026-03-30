@@ -3,23 +3,24 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/27 17:17:14 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/30 10:54:05 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-// FASE INICIAL DE AUTENTICACIÓN. Procesa comandos iniciales de autenticación (PASS y CAP) y marca si la contraseña es correcta, ignorando CAP.
-// Ahora NO cerramos conexión si el orden es incorrecto. Permitimos PASS en cualquier momento antes del registro.
-// Si es incorrecto enviamos 464 pero NO cerramos. CAP se ignora.
+// CHECK the password and ignore any CAP
 bool Server::handleAuthenticationCmds(size_t &i, const std::string &line)
 {
 	int clientFd = _fds[i].fd;
 
-	if (line.compare(0, 5, "PASS ") == 0)
+	// "PASS <password>"
+	// nc: PASS <password>
+	// irssi: automatic
+	if (line.compare(0, 5, "PASS ") == 0) // Check the password
 	{
 		std::string given = line.substr(5);
 
@@ -34,18 +35,17 @@ bool Server::handleAuthenticationCmds(size_t &i, const std::string &line)
 			std::cout << "fd " << clientFd << " PASS incorrecto\n";
 		}
 	}
-	else if (line.compare(0, 4, "CAP ") == 0)
+	// "CAP LS / CAP END / CAP *"
+	// nc: CAP LS
+	// irssi: automatic
+	else if (line.compare(0, 4, "CAP ") == 0) // We ignore any CAP
 	{
-		// parse sencillo del subcomando tras "CAP "
 		std::string rest = line.substr(4);
-		// trim inicio (espacios/tabs)
 		size_t start = 0;
 		while (start < rest.size() && (rest[start] == ' ' || rest[start] == '\t'))
 			start++;
 
 		rest = rest.substr(start);
-
-		// obtener primer token (subcomando)
 		size_t space = rest.find(' ');
 		std::string subcmd;
 
@@ -53,33 +53,32 @@ bool Server::handleAuthenticationCmds(size_t &i, const std::string &line)
 			subcmd = rest;
 		else
 			subcmd = rest.substr(0, space);
-
-		// quitar CR si llegó
 		if (!subcmd.empty() && subcmd[subcmd.size() - 1] == '\r')
 			subcmd.erase(subcmd.size() - 1);
 
 		if (subcmd == "LS")
 		{
-			sendNumericMessage(clientFd, "CAP * LS :"); // Respondemos exactamente como hace irssi por defecto cuando pedimos LS:
-			std::cout << "fd " << clientFd << " CAP LS recibido (ignorando)\n";
+			sendNumericMessage(clientFd, "CAP * LS :");
+			std::cout << "fd " << clientFd << " CAP LS received (ignored)\n";
 		}
 		else if (subcmd == "END")
-			std::cout << "fd " << clientFd << " CAP END recibido (ignorando)\n"; // No respondemos nada, solo lo ignoramos
+			std::cout << "fd " << clientFd << " CAP END received (ignored)\n";
 		else
-			std::cout << "fd " << clientFd << " CAP " << subcmd << " recibido (ignorando)\n"; // Otros subcomandos CAP: ignorar pero loguear
+			std::cout << "fd " << clientFd << " CAP " << subcmd << " received (ignored)\n"; 
 	}
 	return (false);
 }
 
-// Asigna un nickname a un cliente verificando que no esté en uso y enviando error si falla
+// SET a nick to a new client
+// "NICK <nickname>"
+// nc: NICK <nickname>
+// irssi: /nick <nickname>
 void Server::handleNickCommand(int clientFd, const std::string &line)
 {
-	// Extraer argumento tras "NICK "
 	std::string newnick;
 	if (line.size() > 5)
 		newnick = line.substr(5);
 
-	// Trim simple: quitar espacios/tabs al inicio/fin
 	size_t start = 0;
 	while (start < newnick.size() && (newnick[start] == ' ' || newnick[start] == '\t'))
 		++start;
@@ -88,45 +87,35 @@ void Server::handleNickCommand(int clientFd, const std::string &line)
 		--end;
 	newnick = newnick.substr(start, end - start);
 
-	// Si el cliente envía más de un token (ej: "nick extra words"),
-	// tomar sólo el primer token (hasta el primer espacio).
 	size_t space = newnick.find(' ');
 	if (space != std::string::npos)
 		newnick = newnick.substr(0, space);
-
-	// limpiar CR si por alguna razón llegó
 	if (!newnick.empty() && newnick[newnick.size() - 1] == '\r')
 		newnick.erase(newnick.size() - 1);
-
-	// validar
 	if (newnick.empty())
 	{
-		// ERR_NONICKNAMEGIVEN 431 (sin prefijo de servidor para simplificar)
-		sendNumericMessage(clientFd, "431 :No nickname given");
+		sendNumericMessage(clientFd, "431 :No nickname given"); // ERR_NONICKNAMEGIVEN 431
 		return;
 	}
-
 	if (isNickInUse(newnick))
 	{
-		// ERR_NICKNAMEINUSE 433
-		//    Usamos "ircserv" como servername por ahora.
 		std::string current = _clients[clientFd].nickname;
 		if (current.empty())
 			current = "*";
-		std::string err = ":ircserv 433 " + current + " " + newnick + " :Nickname is already in use";
+		std::string err = ":ircserv 433 " + current + " " + newnick + " :Nickname is already in use"; // ERR_NICKNAMEINUSE 433
 		sendNumericMessage(clientFd, err);
 		return;
 	}
-
-	// Si todo bien, asignar el nickname limpio (sin espacios)
 	_clients[clientFd].nickname = newnick;
 	std::cout << "fd " << clientFd << " set NICK=" << newnick << "\n";
 }
 
-// Registra el nombre de usuario del cliente con el comando USER
+// SET a user to a new client
+// "USER <username>"
+// nc: USER <username> 
+// irssi: automatic
 void Server::handleUserCommand(int clientFd, const std::string &line)
 {
-	// USER <user> <mode> <unused> :<realname>
 	std::string rest = line.substr(5);
 	std::string user;
 	std::string realname;
@@ -158,31 +147,29 @@ void Server::handleUserCommand(int clientFd, const std::string &line)
 		std::cout << "fd " << clientFd << " set USER=" << user << "\n";
 	}
 	else
-		sendNumericMessage(clientFd, "461 USER :Not enough parameters"); 	// ERR_NEEDMOREPARAMS 461 (usar sendNumericMessage en vez de send directo)
+		sendNumericMessage(clientFd, "461 USER :Not enough parameters"); 	// ERR_NEEDMOREPARAMS 461
 }
 
-// Permite a un cliente unirse a un canal, creando el canal si no existe, validando permisos y claves
+// JOIN a channel
+// "JOIN <#channel> [key]"
+// nc: JOIN <#channel>
+// nc: JOIN <#channel> [key]
+// irssi: /join <#channel>
+// irssi: /join <#channel> [key]
 void Server::handleJoinCommand(int clientFd, const std::string &line)
 {
-	// "JOIN <#channel> [key]"
 	std::string rest;
 	if (line.size() > 5)
 		rest = line.substr(5);
-
-	// trim inicio/fin
 	while (!rest.empty() && (rest[0] == ' ' || rest[0] == '\t'))
 		rest.erase(0, 1);
 	while (!rest.empty() && (rest[rest.size() - 1] == ' ' || rest[rest.size() - 1] == '\t'))
 		rest.erase(rest.size() - 1, 1);
-
-	// Si no hay parámetros, devolvemos error estándar
 	if (rest.empty())
 	{
 		sendNumericMessage(clientFd, "461 JOIN :Not enough parameters");
 		return;
 	}
-
-	// separar canal y key opcional (solo soportamos un canal por JOIN en esta impl)
 	std::string nameChannel;
 	std::string joinKey;
 	size_t space = rest.find(' ');
@@ -194,36 +181,27 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 	{
 		nameChannel = rest.substr(0, space);
 		joinKey = rest.substr(space + 1);
-
-		// trim joinKey
 		while (!joinKey.empty() && (joinKey[0] == ' ' || joinKey[0] == '\t'))
 			joinKey.erase(0, 1);
 		while (!joinKey.empty() && (joinKey[joinKey.size() - 1] == ' ' || joinKey[joinKey.size() - 1] == '\t'))
 			joinKey.erase(joinKey.size() - 1, 1);
 	}
-
-	// quitar CR si hay
 	if (!nameChannel.empty() && nameChannel[nameChannel.size() - 1] == '\r')
 		nameChannel.erase(nameChannel.size() - 1, 1);
 	if (!joinKey.empty() && joinKey[joinKey.size() - 1] == '\r')
 		joinKey.erase(joinKey.size() - 1, 1);
-
-	// Validación mínima: nombre de canal no vacío
 	if (nameChannel.empty())
 	{
 		sendNumericMessage(clientFd, "461 JOIN :Not enough parameters");
 		return;
 	}
-
-	// VALIDACIÓN DEL NOMBRE DEL CANAL: prefijo válido (# & + !)
 	if (nameChannel[0] != '#' && nameChannel[0] != '&' && nameChannel[0] != '+' && nameChannel[0] != '!')
 	{
 		sendNumericMessage(clientFd, "403 " + nameChannel + " :Invalid channel prefix");
 		return;
 	}
 
-	// crear canal si no existe; el primer usuario será operador por simplicidad
-	if (_channels.find(nameChannel) == _channels.end())
+	if (_channels.find(nameChannel) == _channels.end()) //Create a new channel and the client is the operator
 	{
 		Channel newChannel(nameChannel);
 		newChannel.addOperator(clientFd);
@@ -231,41 +209,35 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 	}
 
 	Channel &channel = _channels[nameChannel];
-
-	// si ya está en el canal, ignorar (o podrías enviar 443 ERR_USERONCHANNEL)
 	if (channel.isClientInChannel(clientFd))
 	{
-		std::cout << "JOIN: fd " << clientFd << " ya estaba en " << nameChannel << "\n";
+		std::cout << "JOIN: fd " << clientFd << " was already in " << nameChannel << "\n";
 		return;
 	}
-
-	// === CHECK: invite-only (+i) ===
-	if (channel.isInviteOnly() && !channel.isClientInvited(clientFd))
+	
+	if (channel.isInviteOnly() && !channel.isClientInvited(clientFd)) // CHECK: invite-only (+i)
 	{
-		// ERR_INVITEONLYCHAN 473
+		
 		std::string nick = _clients[clientFd].nickname;
 		if (nick.empty())
 			nick = convertIntToString(clientFd);
-		sendNumericMessage(clientFd, "473 " + nick + " " + nameChannel + " :Cannot join channel (+i)");
+		sendNumericMessage(clientFd, "473 " + nick + " " + nameChannel + " :Cannot join channel (+i)"); // ERR_INVITEONLYCHAN 473
 		return;
 	}
 
-	// === CHECK: key (+k) ===
-	if (channel.hasKey())
+	if (channel.hasKey()) // CHECK: key (+k)
 	{
-		// si no ha proporcionado key o es incorrecta -> ERR_BADCHANNELKEY 475
 		if (joinKey.empty() || joinKey != channel.getKey())
 		{
 			std::string nick = _clients[clientFd].nickname;
 			if (nick.empty())
 				nick = convertIntToString(clientFd);
-			sendNumericMessage(clientFd, "475 " + nick + " " + nameChannel + " :Cannot join channel (+k)");
+			sendNumericMessage(clientFd, "475 " + nick + " " + nameChannel + " :Cannot join channel (+k)"); // ERR_BADCHANNELKEY 475
 			return;
 		}
 	}
 
-	// === CHECK: limit (+l) ===
-	if (channel.getUserLimit() > 0 && (int)channel.clients.size() >= channel.getUserLimit())
+	if (channel.getUserLimit() > 0 && (int)channel.clients.size() >= channel.getUserLimit()) // CHECK: limit (+l)
 	{
 		std::string nick = _clients[clientFd].nickname;
 		if (nick.empty())
@@ -274,59 +246,39 @@ void Server::handleJoinCommand(int clientFd, const std::string &line)
 		return;
 	}
 
-	// Todo OK -> unir al canal (modifica la estructura Channel)
 	channel.addClient(clientFd);
-
-	// Si venía por invitación, consumirla (la invitación se gasta)
 	if (channel.isClientInvited(clientFd))
 		channel.removeInvitedClient(clientFd);
 
-	// A partir de aquí nos limitamos a delegar la construcción y envío de replies/broadcast
-	// a la función auxiliar, para mantener esta función centrada en parsing/validación.
-	// La función auxiliar asumirá que clientFd ya ha sido añadido a channel.clients.
 	sendJoinInfo(clientFd, nameChannel);
 }
 
-// Envía a todos los miembros del canal los mensajes de unión, modos, topic y lista de usuarios
+// Send all channel members the join messages, modes, topic, and user list
 void Server::sendJoinInfo(int clientFd, const std::string &nameChannel)
 {
-	// Asumimos que nameChannel existe en _channels y que clientFd ya está en channel.clients
 	Channel &channel = _channels[nameChannel];
-
-	// Construcción del prefijo IRC correcto (nick!user@localhost)
 	std::string nick = _clients[clientFd].nickname;
 	std::string user = _clients[clientFd].username;
-
 	if (nick.empty())
 		nick = convertIntToString(clientFd);
-
 	if (user.empty())
 		user = "user";
 
 	std::string prefix = nick + "!" + user + "@localhost";
-
-	// mensaje JOIN que verán todos los clientes del canal (broadcast)
-	// Este broadcast incluye al propio cliente que acaba de unirse (como espera IRC).
 	std::string joinmsg = ":" + prefix + " JOIN " + nameChannel;
-
-	// Recorremos la lista de clientes del canal y enviamos el JOIN a cada uno
 	std::set<int>::iterator iteratorMessageJoin = channel.clients.begin();
 	while (iteratorMessageJoin != channel.clients.end())
 	{
 		int fd = *iteratorMessageJoin;
-
-		// Si por algún motivo el fd no existe en nuestra tabla de clientes, lo saltamos.
 		if (_clients.find(fd) == _clients.end())
 		{
 			++iteratorMessageJoin;
 			continue;
 		}
-
 		sendNumericMessage(fd, joinmsg);
 		++iteratorMessageJoin;
 	}
-	// Enviar estado de modos del canal (RPL_CHANNELMODEIS 324)
-	// Construimos la cadena de modos y sus parámetros (si corresponde).
+	// Send channel mode status (RPL_CHANNELMODEIS 324)
 	std::string modes = "";
 	std::string params = "";
 	if (channel.isInviteOnly())
@@ -343,29 +295,21 @@ void Server::sendJoinInfo(int clientFd, const std::string &nameChannel)
 		modes = modes + "l";
 		params = params + " " + convertIntToString(channel.getUserLimit());
 	}
-
 	if (!modes.empty())
 	{
 		std::string reply = ":ircserv 324 " + nick + " " + nameChannel + " +" + modes + params;
 		sendNumericMessage(clientFd, reply);
 	}
-	// Enviar TOPIC (332) o NOTOPIC (331)
-	// Muchos clientes esperan este reply antes de procesar NAMES.
+	// send topic
 	std::string topic = "";
-	// asumimos que Channel tiene getTopic() que devuelve "" si no hay topic
-	// si no existe, sustituye por la forma correcta de obtener el topic.
 	topic = channel.getTopic();
 	if (!topic.empty())
-		sendNumericMessage(clientFd, ":ircserv 332 " + nick + " " + nameChannel + " :" + topic); // RPL_TOPIC 332 <nick> <channel> :<topic>
+		sendNumericMessage(clientFd, ":ircserv 332 " + nick + " " + nameChannel + " :" + topic); // RPL_TOPIC 332
 	else
-		sendNumericMessage(clientFd, ":ircserv 331 " + nick + " " + nameChannel + " :No topic is set"); // RPL_NOTOPIC 331 <nick> <channel> :No topic is set
+		sendNumericMessage(clientFd, ":ircserv 331 " + nick + " " + nameChannel + " :No topic is set"); // RPL_NOTOPIC 331
 
-	// Enviar lista de usuarios del canal al cliente que entra (NAMES - 353)
-	// Construimos la línea completa de NAMES y la enviamos en un solo sendNumericMessage
-	// (si lo prefieres puedes enviar en múltiples paquetes, pero aquí respetamos
-	// la forma en que lo tenías originalmente).
+	// Send user list
 	std::string names = ":ircserv 353 " + nick + " = " + nameChannel + " :";
-
 	std::set<int>::iterator iteratorCreateList = channel.clients.begin();
 	while (iteratorCreateList != channel.clients.end())
 	{
@@ -375,7 +319,6 @@ void Server::sendJoinInfo(int clientFd, const std::string &nameChannel)
 			++iteratorCreateList;
 			continue;
 		}
-
 		std::string entryNick;
 		if (_clients[fd].nickname.empty())
 			entryNick = convertIntToString(fd);
@@ -389,43 +332,39 @@ void Server::sendJoinInfo(int clientFd, const std::string &nameChannel)
 
 		++iteratorCreateList;
 	}
-
-	// Enviamos la lista y el marcador de fin de lista.
 	sendNumericMessage(clientFd, names);
 	sendNumericMessage(clientFd, ":ircserv 366 " + nick + " " + nameChannel + " :End of /NAMES list");
 
-	// Mensaje por consola para depuración / logs
-	std::cout << "JOIN: cliente fd " << clientFd << " unido a " << nameChannel << "\n";
+	std::cout << "JOIN: client fd " << clientFd << " join a " << nameChannel << "\n";
 }
 
-// Permite a un cliente salir de un canal, notificando a todos los miembros y eliminando el canal si queda vacío
+// Client leaves a channel, it notifies all members and deletes the channel if it becomes empty.
+// "PART <#channel> [:<reason>]"
+// nc: PART <#channel> 
+// nc: PART <#channel> [:<reason>]
+// irssi: /part <#channel> 
+// irssi: /part <#channel> [:<reason>]
 void Server::handlePartCommand(int clientFd, const std::string &line)
 {
-	// Prefijo "PART " longitud 5
 	const size_t prefix_len = 5;
 	if (line.size() <= prefix_len)
 	{
 		sendNumericMessage(clientFd, "461 PART :Not enough parameters");
 		return;
 	}
-
-	// extraer canal (soportamos sólo un canal en esta implementación)
 	size_t space = line.find(' ', prefix_len);
 	std::string channelName;
 	std::string reason;
 
 	if (space == std::string::npos)
 	{
-		// puede que línea sea "PART #channelName" o "PART #channelName\r"
 		channelName = line.substr(prefix_len);
-		// quitar CR final si existe
 		if (!channelName.empty() && channelName[channelName.size() - 1] == '\r')
 			channelName.erase(channelName.size() - 1, 1);
 	}
-	else
+	else //find reason; if there's no reason, ignore it.
 	{
 		channelName = line.substr(prefix_len, space - prefix_len);
-		// buscar si hay ':' para reason después de space
 		size_t colon = line.find(':', space + 1);
 		if (colon != std::string::npos)
 		{
@@ -435,25 +374,19 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 		}
 		else
 		{
-			// tal vez no haya comment: el resto es el canal o espacios
 			std::string maybe = line.substr(space + 1);
-			// si no contiene ':', no lo usamos como reason; normalmente after channelName there is optional reason introduced by ':'
 			(void)maybe;
 		}
 	}
-	// trim sencillo de channelName (inicio/fin)
 	while (!channelName.empty() && (channelName[0] == ' ' || channelName[0] == '\t'))
 		channelName.erase(0, 1);
-
 	while (!channelName.empty() && (channelName[channelName.size() - 1] == ' ' || channelName[channelName.size() - 1] == '\t'))
 		channelName.erase(channelName.size() - 1, 1);
-
 	if (channelName.empty())
 	{
 		sendNumericMessage(clientFd, "461 PART :Not enough parameters");
 		return;
 	}
-	// Comprueba si existe el canal
 	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
 	if (it == _channels.end())
 	{
@@ -461,13 +394,11 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 		return;
 	}
 	Channel &channel = it->second;
-	// Comprueba que el emisor esté en el canal
 	if (!channel.isClientInChannel(clientFd))
 	{
 		sendNumericMessage(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
-	// Construir prefijo: nick!user@localhost
 	std::string emNick = _clients[clientFd].nickname;
 	std::string emUser = _clients[clientFd].username;
 	if (emNick.empty())
@@ -475,13 +406,11 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 	if (emUser.empty())
 		emUser = "user";
 	std::string prefix = emNick + "!" + emUser + "@localhost";
-	// Construir mensaje PART
 	std::string out = ":" + prefix + " PART " + channelName;
 	if (!reason.empty())
 		out = out + " :" + reason;
 	else
 		out = out + " :";
-	// Enviar PART a todos los miembros del canal (incluyendo el que sale)
 	std::set<int>::iterator sit = channel.clients.begin();
 	while (sit != channel.clients.end())
 	{
@@ -490,56 +419,48 @@ void Server::handlePartCommand(int clientFd, const std::string &line)
 			sendNumericMessage(fd, out);
 		++sit;
 	}
-	// Quitar al cliente del canal (Channel::removeClient también quita operadores)
 	channel.removeClient(clientFd);
 
-	// Si el canal queda vacío, eliminarlo del mapa
+	// Deletes the channel if it becomes empty
 	if (channel.clients.empty())
 		_channels.erase(it);
 }
 
-// Procesa un mensaje privado o de canal (PRIVMSG)
-// Analiza un mensaje PRIVMSG recibido, extrae el destinatario y el texto, construye el prefijo del emisor y luego delega el envío y procesamiento real del mensaje
+// Handle a private message
+// "PRIVMSG <target> :<message>
+// nc:    PRIVMSG <targetCHANNEL> :<message>
+// nc:    PRIVMSG <targetUSER> :<message>
+// irssi: /msg <targetCHANNEL> :<message>
+// irssi: /msg <target> :<message>
 void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 {
-	// "PRIVMSG <target> :<message>"
-	const size_t prefix_len = 8; // strlen("PRIVMSG ")
+	const size_t prefix_len = 8;
 	if (line.size() <= prefix_len)
 	{
 		sendNumericMessage(clientFd, "461 PRIVMSG :Not enough parameters");
 		return;
 	}
-
-	// localizar espacio tras "PRIVMSG "
 	size_t space = line.find(' ', prefix_len);
 	if (space == std::string::npos)
 	{
 		sendNumericMessage(clientFd, "461 PRIVMSG :Not enough parameters");
 		return;
 	}
-	// extraer target (nick o canal)
 	std::string target = line.substr(prefix_len, space - prefix_len);
-
-	// trim target por seguridad (inicio / fin)
 	while (!target.empty() && (target[0] == ' ' || target[0] == '\t'))
 		target.erase(0, 1);
 	while (!target.empty() && (target[target.size() - 1] == ' ' || target[target.size() - 1] == '\t'))
 		target.erase(target.size() - 1, 1);
-	// localizar ':' que inicia el texto del mensaje
 	size_t colon = line.find(':', space + 1);
 	std::string text;
 
 	if (colon == std::string::npos)
 	{
-		// No hay ':', pero puede que el cliente haya enviado el mensaje sin el prefijo ':'
-		// Ej: "PRIVMSG nick hello there" -> tomar el resto tras el target como texto.
 		text = line.substr(space + 1);
-		// trim simple de inicio/fin
 		while (!text.empty() && (text[0] == ' ' || text[0] == '\t'))
 			text.erase(0, 1);
 		while (!text.empty() && (text[text.size() - 1] == '\r' || text[text.size() - 1] == '\n'))
 			text.erase(text.size() - 1, 1);
-
 		if (text.empty())
 		{
 			sendNumericMessage(clientFd, "412 :No text to send");
@@ -554,20 +475,15 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 			sendNumericMessage(clientFd, "412 :No text to send");
 			return;
 		}
-		// quitar posible CR al final
 		if (!text.empty() && text[text.size() - 1] == '\r')
 			text.erase(text.size() - 1);
 	}
-	// Construcción del prefijo IRC del emisor (nick!user@host)
 	std::string nick = _clients[clientFd].nickname;
 	std::string user = _clients[clientFd].username;
-
 	if (nick.empty())
 		nick = convertIntToString(clientFd);
-
 	if (user.empty())
 		user = "user";
-
 	std::string prefix = nick + "!" + user + "@localhost";
 
 	processPrivmsgCommand(clientFd, target, text, prefix, nick);

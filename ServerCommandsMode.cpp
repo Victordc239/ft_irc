@@ -3,15 +3,21 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommandsMode.cpp                             :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/10 14:47:22 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/27 16:52:55 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/30 11:07:02 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
+// "MODE <#channel> +i" -> invite-only ON
+// "MODE <#channel> -i" -> invite-only OFF
+// nc: MODE <#channel> +i
+// nc: MODE <#channel> -i
+// irssi: /mode <#channel> +i
+// irssi: /mode <#channel> -i
 void Server::mode_i(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &prefix)
 {
 	if (!channel.isClientOperator(clientFd))
@@ -38,6 +44,12 @@ void Server::mode_i(int clientFd, Channel &channel, const std::string &channelNa
 	}
 }
 
+// "MODE <#channel> +t" -> only operators can change topic
+// "MODE <#channel> -t" -> NO only operators can change topic
+// nc: MODE <#channel> +t
+// nc: MODE <#channel> -t
+// irssi: /mode <#channel> +t
+// irssi: /mode <#channel> -t
 void Server::mode_t(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &prefix)
 {
 	if (!channel.isClientOperator(clientFd))
@@ -64,6 +76,12 @@ void Server::mode_t(int clientFd, Channel &channel, const std::string &channelNa
 	}
 }
 
+// "MODE <#channel> +k <password>"  -> set password to join channel
+// "MODE <#channel> -k" -> remove password to join channel
+// nc: MODE <#channel> +k <password>
+// nc: MODE <#channel> -k
+// irssi: /mode <#channel> +k <password>
+// irssi: /mode <#channel> -k
 void Server::mode_k(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &param, const std::string &prefix)
 {
 	if (!channel.isClientOperator(clientFd))
@@ -102,6 +120,12 @@ void Server::mode_k(int clientFd, Channel &channel, const std::string &channelNa
 	}
 }
 
+// "MODE <#channel> +o <nick>" -> assign an operator to a user
+// "MODE <#channel> -o <nick>" -> remove operator from a user
+// nc: MODE <#channel> +o <nick>
+// nc: MODE <#channel> -o <nick>
+// irssi: /mode <#channel> +o <nick>
+// irssi: /mode <#channel> -o <nick>
 void Server::mode_o(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &targetNick, const std::string &prefix)
 {
 	if (!channel.isClientOperator(clientFd))
@@ -146,6 +170,12 @@ void Server::mode_o(int clientFd, Channel &channel, const std::string &channelNa
 	}
 }
 
+// "MODE <#channel> +l <numberClients>" -> limit users per channel
+// "MODE <#channel> -l" -> remove limit users per channel
+// nc: MODE <#channel> +l <numberClients>
+// nc: MODE <#channel> -l
+// irssi: /mode <#channel> +l <numberClients>
+// irssi: /mode <#channel> -l
 void Server::mode_l(int clientFd, Channel &channel, const std::string &channelName, bool plus, const std::string &param, const std::string &prefix)
 {
 	if (!channel.isClientOperator(clientFd))
@@ -156,7 +186,6 @@ void Server::mode_l(int clientFd, Channel &channel, const std::string &channelNa
 
 	if (plus)
 	{
-		// param should be number
 		const char *s = param.c_str();
 		char *endptr = NULL;
 		long v = ft_strtol(s, &endptr);
@@ -193,6 +222,12 @@ void Server::mode_l(int clientFd, Channel &channel, const std::string &channelNa
 	}
 }
 
+// "MODE <nick> +i" -> user invisible
+// "MODE <nick> -i" -> ruser no invisible
+// nc: MODE <nick> +i
+// nc: MODE <nick> -i
+// irssi: /mode <nick> +i
+// irssi: /mode <nick> -i
 void Server::mode_user(int clientFd, const std::string &target, const std::string &rest)
 {
 	std::map<int, Client>::iterator itClient = _clients.find(clientFd);
@@ -202,8 +237,7 @@ void Server::mode_user(int clientFd, const std::string &target, const std::strin
 	std::string myNick = itClient->second.nickname;
 	if (myNick.empty() || myNick != target)
 	{
-		// ERR_USERSDONTMATCH 502
-		sendNumericMessage(clientFd, "502 :Cannot change mode for other users");
+		sendNumericMessage(clientFd, "502 :Cannot change mode for other users"); // ERR_USERSDONTMATCH 502
 		return;
 	}
 	

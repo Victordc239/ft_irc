@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Channel.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:57 by victor            #+#    #+#             */
-/*   Updated: 2026/03/27 16:37:33 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/30 09:53:45 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,10 +18,10 @@ Channel::Channel()
 	clients.clear();
 	operators.clear();
 	topic = "";
-	topic_set_by = "";
-	topic_set_time = 0;
-	topic_restricted = true;
-	invite_only = false;
+	topicSetBy = "";
+	topicSetTime = 0;
+	topicRestricted = true;
+	inviteOnly = false;
 	key = "";
 	limit = 0;
 }
@@ -32,10 +32,10 @@ Channel::Channel(const std::string &channel_name)
 	clients.clear();
 	operators.clear();
 	topic = "";
-	topic_set_by = "";
-	topic_set_time = 0;
-	topic_restricted = true;
-	invite_only = false;
+	topicSetBy = "";
+	topicSetTime = 0;
+	topicRestricted = true;
+	inviteOnly = false;
 	key = "";
 	limit = 0;
 }
@@ -46,10 +46,10 @@ Channel::Channel(const Channel &other)
 	clients = other.clients;
 	operators = other.operators;
 	topic = other.topic;
-	topic_set_by = other.topic_set_by;
-	topic_set_time = other.topic_set_time;
-	topic_restricted = other.topic_restricted;
-	invite_only = other.invite_only;
+	topicSetBy = other.topicSetBy;
+	topicSetTime = other.topicSetTime;
+	topicRestricted = other.topicRestricted;
+	inviteOnly = other.inviteOnly;
 	key = other.key;
 	limit = other.limit;
 }
@@ -62,10 +62,10 @@ Channel &Channel::operator=(const Channel &other)
 		clients = other.clients;
 		operators = other.operators;
 		topic = other.topic;
-		topic_set_by = other.topic_set_by;
-		topic_set_time = other.topic_set_time;
-		topic_restricted = other.topic_restricted;
-		invite_only = other.invite_only;
+		topicSetBy = other.topicSetBy;
+		topicSetTime = other.topicSetTime;
+		topicRestricted = other.topicRestricted;
+		inviteOnly = other.inviteOnly;
 		key = other.key;
 		limit = other.limit;
 	}
@@ -112,8 +112,8 @@ bool Channel::isClientOperator(int fd) const
 void Channel::setTopic(const std::string &newTopic, const std::string &setter)
 {
 	topic = newTopic;
-	topic_set_by = setter;
-	topic_set_time = std::time(NULL);
+	topicSetBy = setter;
+	topicSetTime = std::time(NULL);
 }
 
 bool Channel::hasTopic() const
@@ -128,22 +128,22 @@ const std::string &Channel::getTopic() const
 
 void Channel::setTopicRestricted(bool v)
 {
-	topic_restricted = v;
+	topicRestricted = v;
 }
 
 bool Channel::isTopicRestricted() const
 {
-	return (topic_restricted);
+	return (topicRestricted);
 }
 
 void Channel::setInviteOnly(bool v)
 {
-	invite_only = v;
+	inviteOnly = v;
 }
 
 bool Channel::isInviteOnly() const
 {
-	return (invite_only);
+	return (inviteOnly);
 }
 
 void Channel::setKey(const std::string &k)

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/27 17:08:03 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/30 10:18:01 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -222,13 +222,13 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 		return (false);
 	}
 	
-	sockaddr_in server_addr; // guardar ip y puerto del servidor
+	sockaddr_in server_addr; // Save ip and port
 	std::memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = AF_INET; //IPv4
-	server_addr.sin_port = htons((uint16_t)port); //Conversion del numero del puerto en bits para que todos los ordenadores lo interpreten igual
-	server_addr.sin_addr.s_addr = INADDR_ANY; // adapator de red del ordenador, ethernet, wifi, localhost,...
+	server_addr.sin_port = htons((uint16_t)port); //Converting the port number into bits so that all computers interpret it the same way
+	server_addr.sin_addr.s_addr = INADDR_ANY; // Ethernet, wifi, localhost,...
 
-	if (bind(_server_fd, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) // La función bind() en sockets sirve para asociar tu servidor a una dirección IP y a un puerto.
+	if (bind(_server_fd, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) //Associate the port and IP address to the socket
 	{
 		std::cerr << "ERROR: bind failure\n";
 		close(_server_fd);
@@ -238,10 +238,8 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 
 	std::cout << "Bind done correctly\n";
 
-	if (listen(_server_fd, SOMAXCONN) == -1)
+	if (listen(_server_fd, SOMAXCONN) == -1) //SOMAXCONN = max number of clients the server can listen to
 	{
-		/*convierte el socket en un servidor que escucha todo lo que le manden los clientes*/
-		/*SOMAXCONN = valor del sistema que representa la máxima cantidad de conexiones pendientes permitidas*/
 		std::cerr << "ERROR: listen failure\n";
 		close(_server_fd);
 		_server_fd = -1;
@@ -251,23 +249,22 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 	std::cout << "Server listening...\n";
 
 	pollfd pfd;
-	pfd.fd = _server_fd; //vigilar el servidor
-	pfd.events = POLLIN; //avisame cuando haya datos a leer
-	pfd.revents = 0; //eventos que han pasado
+	pfd.fd = _server_fd;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
 	_fds.push_back(pfd);
 
 	return (true);
 }
 
-// Lee los bytes que el cliente envía por su socket, ejecuta sus comandos, registra usuarios y gestiona desconexiones
+// Executes commands, registers users, and manages disconnections
 bool Server::handleClientEvent(size_t i)
 {
-	// Lectura normal en cliente (POLLIN)
 	if (!(_fds[i].revents & POLLIN))
 		return (false);
 
 	int clientFd = _fds[i].fd;
-	ssize_t n = recv(clientFd, _buf, BUF_SIZE, 0); //la cantidad de bytes que ha enviado el cliente al servidor
+	ssize_t n = recv(clientFd, _buf, BUF_SIZE, 0); //number of bytes that the client has sent to the server
 
 	if (n > 0)
 	{
@@ -282,10 +279,8 @@ bool Server::handleClientEvent(size_t i)
 			std::cout << "fd " << clientFd << " -> Line received: [" << line << "]\n";
 			if (!_clients[clientFd].registered)
 			{
-				// Siempre permitir PASS y CAP antes del registro
+				// Unregistered USER
 				handleAuthenticationCmds(i, line);
-
-				// Cliente NO registrado aún
 				if (line.compare(0, 5, "NICK ") == 0)
 					handleNickCommand(clientFd, line);
 				else if (line.compare(0, 5, "USER ") == 0)
@@ -305,49 +300,39 @@ bool Server::handleClientEvent(size_t i)
 					sendNumericMessage(clientFd, "451 :You have not registered"); // ERR_NOTREGISTERED 451
 				}
 
-				// Si ya tenemos PASS correcto + NICK + USER → registrar
+				// Registered USER = PASS check+ USER check + NICK check
 				if (_clients[clientFd].correctPass && !_clients[clientFd].nickname.empty() && !_clients[clientFd].username.empty())
 				{
 					_clients[clientFd].registered = true;
 					std::string welcome = "001 " + _clients[clientFd].nickname + " :Welcome to the simple IRCd";
 					sendNumericMessage(clientFd, welcome);
-					std::cout << "fd " << clientFd << " registered (PASS+NICK+USER). Sent 001.\n"; // send RPL_WELCOME (001)
+					std::cout << "fd " << clientFd << " registered (PASS+NICK+USER). Sent 001.\n"; // RPL_WELCOME (001)
 				}
 			}
 			else
 			{
-				// como irssi manda CAP para imprimir mensaje en el servidor de que lo ignoramos
 				if (line.compare(0, 4, "CAP ") == 0)
 					handleAuthenticationCmds(i, line);
-				//JOIN = para conectarte a un canal, los canales se llaman con prefijos: # ! & +
 				else if (line.compare(0, 5, "JOIN ") == 0)
 					handleJoinCommand(clientFd, line);
-				//PART = salir de un canal
 				else if (line.compare(0, 5, "PART ") == 0)
 					handlePartCommand(clientFd, line);
-				//PRIVMSG = mensaje privado
 				else if (line.compare(0, 8, "PRIVMSG ") == 0)
 					handlePrivmsgCommand(clientFd, line);
-				//KICK = operator expulsa a un regular user de un caanal
 				else if (line.compare(0, 5, "KICK ") == 0)
 					handleKickCommand(clientFd, line);
-				//INVITE = operator invita a un cliente a un canaal
 				else if (line.compare(0, 7, "INVITE ") == 0)
 					handleInviteCommand(clientFd, line);
-				//TOPIC = Ver el topic del canal o cambiarlo
 				else if (line.compare(0, 6, "TOPIC ") == 0)
 					handleTopicCommand(clientFd, line);
-				//MODE = operator puede cambiar diversas cosas con la flag +i +t +k +o +l
 				else if (line.compare(0, 5, "MODE ") == 0)
 					handleChannelModes(clientFd, line);
-				// IRSSI(cliente) esta mandando PING y si no contestamos PONG IRSSI(cliente) se desconecta
 				else if (line.compare(0, 5, "PING ") == 0)
 				{
 					std::string ping_target = line.substr(5);
 					sendNumericMessage(clientFd, "PONG " + ping_target);
 					std::cout << "fd " << clientFd << " -> Responds PONG to [" << ping_target << "]\n";
 				}
-				//una vez ya autorizado respondemos si nos ponen denuevo estos comandos de autorizacion
 				else if (line.compare(0, 5, "PASS ") == 0 || line.compare(0, 5, "USER ") == 0)
 				{
 					std::string cur = _clients[clientFd].nickname;
@@ -355,13 +340,9 @@ bool Server::handleClientEvent(size_t i)
 						cur = "*";
 					sendNumericMessage(clientFd, ":ircserv 462 " + cur + " :You may not reregister"); // ERR_ALREADYREGISTERED 462
 				}
-				//NICK = cambiar el nickname una vez el cliente ya esta registrado
 				else if (line.compare(0, 5, "NICK ") == 0)
 				{
-					// Guardamos el nick actual poder saber si cambia
 					std::string originalNick = _clients[clientFd].nickname;
-
-					// Construimos el prefijo antiguo nick!user@host
 					std::string displayOldNick;
 					if (originalNick.empty())
 						displayOldNick = convertIntToString(clientFd);
@@ -375,11 +356,7 @@ bool Server::handleClientEvent(size_t i)
 						user = _clients[clientFd].username;
 
 					std::string oldPrefix = displayOldNick + "!" + user + "@localhost";
-
-					// Reutilizamos la función que ya valida y asigna el nuevo nick
 					handleNickCommand(clientFd, line);
-
-					// Si el nick cambió correctamente notificamos a los demás clientes
 					std::string newNick = _clients[clientFd].nickname;
 					if (newNick != originalNick && !newNick.empty())
 					{
@@ -393,34 +370,30 @@ bool Server::handleClientEvent(size_t i)
 					}
 				}
 				else
-					sendNumericMessage(clientFd, "421 :Unknown command"); //Comandos no implementados o desconocidgos
+					sendNumericMessage(clientFd, "421 :Unknown command");
 			}
 			_clients[clientFd].accumulator.erase(0, pos + 1);
 		}
 	}
-	else if (n == 0) // Cliente cerró conexión de forma ordenada -> limpiar también transfers relacionados
+	else if (n == 0) // The client closed the connection.
 	{
 		int closedFd = clientFd;
 		std::cout << "Client (fd " << closedFd << ") closed the connection\n";
-
-		cleanupClientTransfers(closedFd); // Limpiar transfers que referencien este cliente como sender/receiver
-
-		close(closedFd); // ahora cerrar y borrar cliente
+		cleanupClientTransfers(closedFd);
+		close(closedFd);
 		_clients.erase(closedFd);
 		_fdToTransferId.erase(closedFd);
 		_fds.erase(_fds.begin() + i);
 		return (true);
 	}
-	else
+	else // There's an error, we're closing everything.
 	{
 		if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
 		{
 			std::cerr << "ERROR: recv failed\n";
 			int bad = clientFd;
-
-			cleanupClientTransfers(bad); // limpiar transfers asociados
-
-			close(clientFd); // cerrar el cliente problemático
+			cleanupClientTransfers(bad);
+			close(clientFd);
 			_clients.erase(clientFd);
 			_fdToTransferId.erase(clientFd);
 			_fds.erase(_fds.begin() + i);
@@ -430,12 +403,12 @@ bool Server::handleClientEvent(size_t i)
 	return (false);
 }
 
-// Bucle principal que gestiona conexiones, mensajes y eventos del servidor
+// Principal loop
 int Server::runServerLoop()
 {
 	while (g_running)
 	{
-		int ret = poll(&_fds[0], _fds.size(), -1); // espera que haya algun evento en un cliente o en el servidor
+		int ret = poll(&_fds[0], _fds.size(), -1); // Wait for some event to occur on a client or server
 		if (ret == -1)
 		{
 			if (errno == EINTR)
@@ -446,7 +419,6 @@ int Server::runServerLoop()
 		size_t i = 0;
 		while (i < _fds.size())
 		{
-			// Si no hay eventos para este fd, seguimos
 			if (_fds[i].revents == 0)
 			{
 				++i;
@@ -454,24 +426,16 @@ int Server::runServerLoop()
 			}
 			if (handleFileTransferEvent(i))
 				continue;
-
-			//Error o desconexión en un cliente o en el servidor 
-			// POLLERR=conexion rota, POLLHUP=cierras la terminal, POLLNVAL=fd corrupto
-			if (_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
+			if (_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) // ERROR or disconnection. POLLERR=broken connection, POLLHUP=close the terminal, POLLNVAL=corrupted fd
 			{
-				// Si el fd desconectado tiene asociado algun transfer (mapping), y además es cliente "normal", debemos limpiar las transferencias relacionadas (sender o receiver)
 				int badfd = _fds[i].fd;
-
-				// Si el fd es server_fd -> error crítico
 				if (badfd == _server_fd)
 				{
 					std::cerr << "ERROR in poll socket\n";
 					g_running = 0;
 					break;
 				}
-				cleanupClientTransfers(badfd); // Antes de cerrar, limpiar transfers que referencien este cliente como sender/receiver
-
-				// Ahora cerramos y borramos el cliente (como antes)
+				cleanupClientTransfers(badfd); 
 				std::cout << "Client (fd " << badfd << ") disconnected/err\n";
 				close(badfd);
 				_clients.erase(badfd);
@@ -479,7 +443,7 @@ int Server::runServerLoop()
 				_fds.erase(_fds.begin() + i);
 				continue;
 			}
-			if (_fds[i].fd == _server_fd && (_fds[i].revents & POLLIN)) // Nueva conexión entrante, POLLIN=poll recibe datos a leer
+			if (_fds[i].fd == _server_fd && (_fds[i].revents & POLLIN)) // NEW conexion
 			{
 				while (true)
 				{
@@ -504,10 +468,9 @@ int Server::runServerLoop()
 					cp.events = POLLIN;
 					cp.revents = 0;
 					_fds.push_back(cp);
-
 					_clients[client_fd] = Client(client_fd);
 
-					char client_ip[INET_ADDRSTRLEN]; //tamaño máximo para almacenar la representación en texto de una dirección IPv4
+					char client_ip[INET_ADDRSTRLEN];
 					if (inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip)) == NULL)
 						std::cout << "Client connected (fd " << client_fd << ") from [unknown IP address]:" << ntohs(client_addr.sin_port) << "!\n"; 
 					else
@@ -516,14 +479,11 @@ int Server::runServerLoop()
 				++i;
 				continue;
 			}
-			if (handleClientEvent(i)) // Lectura normal en cliente (POLLIN)
+			if (handleClientEvent(i)) // Normal reading at client (POLLIN)
 				continue;
-			// Manejo de POLLOUT para sockets de cliente normales (enviar buffer de servidor->cliente)
-			if (_fds[i].revents & POLLOUT)
+			if (_fds[i].revents & POLLOUT) // Send buffer from server->client (POLLOUT)
 			{
 				int fd = _fds[i].fd;
-
-				// Si por algún motivo el fd ya no existe en clients, lo cerramos
 				if (_clients.find(fd) == _clients.end())
 				{
 					close(fd);
@@ -532,7 +492,6 @@ int Server::runServerLoop()
 				}
 
 				std::string &data = _clients[fd].outBuffer;
-
 				while (!data.empty())
 				{
 					ssize_t sent = send(fd, data.c_str(), data.size(), 0);
@@ -544,34 +503,27 @@ int Server::runServerLoop()
 					else
 					{
 						std::cerr << "ERROR: send failed\n";
-						// cerrar el cliente y limpiar transfers relacionados
 						int badfd = fd;
 						close(badfd);
 						_clients.erase(badfd);
 						_fdToTransferId.erase(badfd);
-						
-						cleanupClientTransfers(badfd); // limpiar transfers relacionados (igual que antes)
-
-						// quitar entrada de _fds correspondiente al cliente (ya cerrada arriba)
+						cleanupClientTransfers(badfd);
 						_fds.erase(_fds.begin() + i);
 						continue;
 					}
 				}
-
-				//Si ya terminé de enviar todo al cliente, deja de preguntarle al sistema si puedo escribir
+				//If I've finished sending everything to the client, put POLLOUT
 				if (_clients.find(fd) != _clients.end() && _clients[fd].outBuffer.empty())
-					_fds[i].events &= ~POLLOUT; /*esta linea=Deja de vigilar escritura para este socket y la ~ es para invertir todos los bits de POLLOUT*/
+					_fds[i].events &= ~POLLOUT;
 			}
-			++i; // avanzar al siguiente fd
+			++i;
 		}
 	}
-	//Mensaje de que el servidor se ha cerrado con Ctr+c o Ctr+\ o kill
 	std::string shutdown_msg = "ERROR :Server is shutting down\r\n";
 	std::map<int, Client>::iterator it = _clients.begin();
 	while (it != _clients.end())
 	{
 		int fd = it->first;
-		// Intentamos enviar de forma directa; si falla, lo ignoramos porque vamos a cerrar.
 		ssize_t s = send(fd, shutdown_msg.c_str(), shutdown_msg.size(), 0);
 		(void)s;
 		++it;

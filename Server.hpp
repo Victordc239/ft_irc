@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
+/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:53:55 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/27 16:44:57 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/30 09:55:03 by victor           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -51,7 +51,7 @@ class Server
 
 		bool	isNickInUse(const std::string &nick) const;
 		void	sendNumericMessage(int fd, const std::string &msg);
-		int		findFdByNick(const std::string &nick) const;
+		int	findFdByNick(const std::string &nick) const;
 		bool	handleAuthenticationCmds(size_t &i, const std::string &line);
 		void	handleNickCommand(int clientFd, const std::string &line);
 		void	handleUserCommand(int clientFd, const std::string &line);
