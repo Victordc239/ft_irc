@@ -6,7 +6,7 @@
 /*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/12 11:52:15 by victor            #+#    #+#             */
-/*   Updated: 2026/03/27 16:41:56 by sofernan         ###   ########.fr       */
+/*   Updated: 2026/03/30 12:51:05 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -96,8 +96,6 @@ int FileTransfer::setNonBlocking(int fd)
 	return (0);
 }
 
-// Crear listener para el proxy DCC.
-// Crea y prepara un socket servidor que escucha conexiones para iniciar una transferencia DCC
 int FileTransfer::createListener()
 {
 	if (socketFileTransfer != -1)
@@ -112,8 +110,6 @@ int FileTransfer::createListener()
 
 	int opt = 1;
 	setsockopt(socketFileTransfer, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)); 
-	// socketFileTransfer=socket, SOL_SOCKET=aplica a todo el socket(no solo al puerto o ip o protocolo),
-	// SO_REUSEADDR=permite reusar ip y puerto, &opt=activarlo, sizeof(opt)=tamaño valor
 
 	if (setNonBlocking(socketFileTransfer) == -1)
 	{
@@ -125,7 +121,7 @@ int FileTransfer::createListener()
 	sockaddr_in addr;
 	std::memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(0); // puerto automático
+	addr.sin_port = htons(0);
 	addr.sin_addr.s_addr = INADDR_ANY;
 
 	if (bind(socketFileTransfer, (sockaddr *)&addr, sizeof(addr)) < 0)
@@ -149,7 +145,6 @@ int FileTransfer::createListener()
 	return (0);
 }
 
-// Obtener puerto asignado. Devuelve el puerto que está usando el socket de escucha de la transferencia
 unsigned short FileTransfer::getListenerPort() const
 {
 	if (socketFileTransfer < 0)
@@ -161,10 +156,9 @@ unsigned short FileTransfer::getListenerPort() const
 	if (getsockname(socketFileTransfer, (sockaddr *)&addr, &len) == -1)
 		return (0);
 
-	return (ntohs(addr.sin_port)); //ntohs devuelve el puerto que usa el cliente cuando se conecta al servidor
+	return (ntohs(addr.sin_port)); //ntohs returns the port used by the client when connecting to the server
 }
 
-// Cerrar todos los sockets propietarios de la transferencia y la marca como terminada
 void FileTransfer::closeTransferSockets()
 {
 	if (socketFileTransfer != -1)
@@ -194,7 +188,6 @@ void FileTransfer::closeTransferSockets()
 	finished = true;
 }
 
-// Comprueba si la transferencia sigue activa o si ya ha finalizado
 bool FileTransfer::isTransferActive() const
 {
 	if (finished)

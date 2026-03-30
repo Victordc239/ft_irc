@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Channel.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 10:46:48 by victor            #+#    #+#             */
-/*   Updated: 2026/03/30 09:53:45 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/30 13:35:26 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,7 +54,7 @@ class Channel
 		bool	hasKey() const;
 		void	removeKey();
 		void	setUserLimit(int n);
-		int	getUserLimit() const;
+		int		getUserLimit() const;
 		void	removeUserLimit();
 		bool	isClientInvited(int fd) const;
 		void	addInvitedClient(int fd);

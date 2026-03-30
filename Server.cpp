@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/04 13:54:20 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/30 10:18:01 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/30 13:09:20 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -226,7 +226,7 @@ bool Server::InitSocketAndListen(long port, const std::string &password)
 	std::memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = AF_INET; //IPv4
 	server_addr.sin_port = htons((uint16_t)port); //Converting the port number into bits so that all computers interpret it the same way
-	server_addr.sin_addr.s_addr = INADDR_ANY; // Ethernet, wifi, localhost,...
+	server_addr.sin_addr.s_addr = INADDR_ANY; // Ethernet, wifi, localhost...
 
 	if (bind(_server_fd, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) //Associate the port and IP address to the socket
 	{
@@ -304,7 +304,7 @@ bool Server::handleClientEvent(size_t i)
 				if (_clients[clientFd].correctPass && !_clients[clientFd].nickname.empty() && !_clients[clientFd].username.empty())
 				{
 					_clients[clientFd].registered = true;
-					std::string welcome = "001 " + _clients[clientFd].nickname + " :Welcome to the simple IRCd";
+					std::string welcome = "001 " + _clients[clientFd].nickname + " :Welcome to the simple IRC";
 					sendNumericMessage(clientFd, welcome);
 					std::cout << "fd " << clientFd << " registered (PASS+NICK+USER). Sent 001.\n"; // RPL_WELCOME (001)
 				}

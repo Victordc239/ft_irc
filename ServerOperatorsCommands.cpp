@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerOperatorsCommands.cpp                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/09 14:39:18 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/30 11:14:56 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/30 14:14:21 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -314,19 +314,15 @@ void Server::handleTopicCommand(int clientFd, const std::string &line)
 	}
 }
 
-// Aplica los cambios de modos a un canal según los permisos del cliente, validando los parámetros
-// y enviando los mensajes correspondientes a los usuarios.
-// Se encarga de interpretar y ejecutar las modificaciones de modos (+i, +t, +k, +l, +o) para un canal, 
-// asegurándose de que solo los operadores puedan hacer ciertos cambios y notificando a todos los afectados.
 void Server::handleChannelModes(int clientFd, const std::string &line)
 {
-	const size_t prefix_len = 5; // "MODE "
+	const size_t prefix_len = 5;
 	if (line.size() <= prefix_len)
 	{
 		sendNumericMessage(clientFd, "461 MODE :Not enough parameters");
 		return;
 	}
-	// Extraer channelName y resto (rest puede contener modes + params)
+
 	size_t space = line.find(' ', prefix_len);
 	std::string channelName;
 	std::string rest;
@@ -345,7 +341,6 @@ void Server::handleChannelModes(int clientFd, const std::string &line)
 			rest.erase(rest.size() - 1, 1);
 	}
 
-	// Trim sencillo de channelName (inicio/fin)
 	while (!channelName.empty() && (channelName[0] == ' ' || channelName[0] == '\t'))
 		channelName.erase(0, 1);
 	while (!channelName.empty() && (channelName[channelName.size() - 1] == ' ' || channelName[channelName.size() - 1] == '\t'))
@@ -357,15 +352,12 @@ void Server::handleChannelModes(int clientFd, const std::string &line)
 		return;
 	}
 
-	/* Si el target no empieza con un caracter de canal entonces es un usuario
-	   y lo manejamos para modos de usuario (ej. MODE <nick> +i) */
 	if (channelName[0] != '#' && channelName[0] != '&' && channelName[0] != '+' && channelName[0] != '!')
 	{
 		mode_user(clientFd, channelName, rest);
 		return;
 	}
 
-	// Comprobar si existe el canal
 	std::map<std::string, Channel>::iterator it = _channels.find(channelName);
 	if (it == _channels.end())
 	{
@@ -374,14 +366,12 @@ void Server::handleChannelModes(int clientFd, const std::string &line)
 	}
 	Channel &channel = it->second;
 
-	// Comprobar si está el emisor en el canal
 	if (!channel.isClientInChannel(clientFd))
 	{
 		sendNumericMessage(clientFd, "442 " + channelName + " :You're not on that channel");
 		return;
 	}
 
-	// Construir nick/usser/prefix (los necesitamos para las respuestas)
 	std::string nick = _clients[clientFd].nickname;
 	std::string user = _clients[clientFd].username;
 	if (nick.empty())
@@ -390,11 +380,7 @@ void Server::handleChannelModes(int clientFd, const std::string &line)
 		user = "user";
 	std::string prefix = nick + "!" + user + "@localhost";
 
-	// ------------------------------
-	// Rama de LECTURA de modos (QUERY)
-	// Si rest está vacío -> petición de ver modos actuales (RPL_CHANNELMODEIS 324)
-	// Permitimos esta consulta a cualquier miembro del canal.
-	// ------------------------------
+// To know which modes are activated
 	if (rest.empty())
 	{
 		std::string modes = "";
@@ -418,18 +404,16 @@ void Server::handleChannelModes(int clientFd, const std::string &line)
 		return;
 	}
 
-	// llamar a la segunda mitad (cambio de modos)
 	handleModeChange(clientFd, channel, channelName, rest, nick, prefix);
 }
 
 void Server::handleModeChange(int clientFd, Channel &channel, const std::string &channelName, const std::string &rest, const std::string &nick, const std::string &prefix)
 {
-	// A partir de aquí -> se intenta CAMBIAR modos
 	std::vector<std::string> tokens;
 	std::string s = rest;
 	while (!s.empty())
 	{
-		while (!s.empty() && (s[0] == ' ' || s[0] == '\t')) // saltar espacios iniciales
+		while (!s.empty() && (s[0] == ' ' || s[0] == '\t'))
 			s.erase(0, 1);
 		if (s.empty())
 			break;
@@ -452,11 +436,9 @@ void Server::handleModeChange(int clientFd, Channel &channel, const std::string 
 		return;
 	}
 
-	std::string modeToken = tokens[0]; // ej "+itk"
+	std::string modeToken = tokens[0];
 	size_t paramIndex = 1;
 	bool plus = true;
-
-	// excepcion de ignorar el mode #test b
 	bool onlyB = true;
 	bool hasPlusSign = false;
 	size_t k = 0;
@@ -481,15 +463,15 @@ void Server::handleModeChange(int clientFd, Channel &channel, const std::string 
 		++k;
 	}
 
-	if (!channel.isClientOperator(clientFd)) //solo operadores pueden cambiar modos.
+	if (!channel.isClientOperator(clientFd))
 	{
 		if (onlyB && hasPlusSign)
-			return; // ignorar silenciosamente +b de no operadores
-		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator"); // cualquier otro intento de cambiar modos requiere operador
+			return;
+		sendNumericMessage(clientFd, "482 " + channelName + " :You're not channel operator");
 		return;
 	}
 
-	size_t i = 0; // A partir de aquí el emisor SÍ es operador -> aplicar cambios
+	size_t i = 0; 
 	while (i < modeToken.size())
 	{
 		if (modeToken[i] == '+')
@@ -520,7 +502,7 @@ void Server::handleModeChange(int clientFd, Channel &channel, const std::string 
 				}
 				mode_k(clientFd, channel, channelName, plus, tokens[paramIndex++], prefix);
 			}
-			else // -k no necesita parámetro
+			else
 				mode_k(clientFd, channel, channelName, plus, std::string(""), prefix);
 		}
 		else if (modeToken[i] == 'l')
@@ -534,12 +516,11 @@ void Server::handleModeChange(int clientFd, Channel &channel, const std::string 
 				}
 				mode_l(clientFd, channel, channelName, plus, tokens[paramIndex++], prefix);
 			}
-			else // -l no necesita parámetro para quitar el límite
+			else
 				mode_l(clientFd, channel, channelName, plus, std::string(""), prefix);
 		}
 		else if (modeToken[i] == 'o')
 		{
-			// necesita parámetro nick
 			if (paramIndex >= tokens.size())
 			{
 				sendNumericMessage(clientFd, "461 MODE :Not enough parameters");

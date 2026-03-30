@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerCommands.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: victor <victor@student.42.fr>              +#+  +:+       +#+        */
+/*   By: sofernan <sofernan@student.42madrid.es>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 16:07:46 by vdiez-cu          #+#    #+#             */
-/*   Updated: 2026/03/30 10:54:05 by victor           ###   ########.fr       */
+/*   Updated: 2026/03/30 13:58:03 by sofernan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,12 +27,12 @@ bool Server::handleAuthenticationCmds(size_t &i, const std::string &line)
 		if (given == _serverPassword)
 		{
 			_clients[clientFd].correctPass = true;
-			std::cout << "fd " << clientFd << " PASS correcto\n";
+			std::cout << "fd " << clientFd << " correct PASS\n";
 		}
 		else
 		{
 			sendNumericMessage(clientFd, "464 :Password incorrect");
-			std::cout << "fd " << clientFd << " PASS incorrecto\n";
+			std::cout << "fd " << clientFd << " incorrect PASS\n";
 		}
 	}
 	// "CAP LS / CAP END / CAP *"
@@ -489,18 +489,14 @@ void Server::handlePrivmsgCommand(int clientFd, const std::string &line)
 	processPrivmsgCommand(clientFd, target, text, prefix, nick);
 }
 
-// Procesa un mensaje PRIVMSG enviándolo al destinatario (usuario o canal), maneja respuestas automáticas 
-// del bot y controla casos especiales como mensajes CTCP o transferencias DCC.
 void Server::processPrivmsgCommand(int clientFd, const std::string &target, const std::string &text, const std::string &prefix, const std::string &nick)
 {
-	// INVOCAR AL BOT (solo si no es CTCP: no procesar mensajes que empiecen por \001)
 	std::string botReply;
 	bool isCTCP = (!text.empty() && text[0] == '\001');
 
 	if (!isCTCP)
-		botReply = _bot.generateReply(text, nick); // pasamos el texto tal cual al bot; el bot rellenará kickTarget si corresponde
+		botReply = _bot.generateReply(text, nick);
 
-	// SI EL MENSAJE ES DIRECTAMENTE AL BOT (PRIVADO)
 	if (target == _bot.getName())
 	{
 		if (!botReply.empty() && !isCTCP)
@@ -513,7 +509,7 @@ void Server::processPrivmsgCommand(int clientFd, const std::string &target, cons
 		}
 		return;
 	}
-	// Si target es canal: reenviar como antes (sin DCC)
+	
 	if (!target.empty() && (target[0] == '#' || target[0] == '&' || target[0] == '+' || target[0] == '!'))
 	{
 		std::map<std::string, Channel>::iterator channelIterator = _channels.find(target);
@@ -531,11 +527,9 @@ void Server::processPrivmsgCommand(int clientFd, const std::string &target, cons
 			return;
 		}
 
-		// 1) Si el bot quiere responder al canal, enviamos su PRIVMSG desde el nick del bot
 		if (!botReply.empty())
 		{
 			std::string botOut = ":" + _bot.getName() + "!bot@localhost PRIVMSG " + target + " :" + botReply;
-			// Enviamos el mensaje del bot a todos los clientes del canal
 			std::set<int>::iterator itb = channel.clients.begin();
 			while (itb != channel.clients.end())
 			{
@@ -546,7 +540,6 @@ void Server::processPrivmsgCommand(int clientFd, const std::string &target, cons
 			}
 		}
 
-		// 2) Reenviar el PRIVMSG original a todos los miembros del canal (igual que antes)
 		std::string out = ":" + prefix + " PRIVMSG " + target + " :" + text;
 
 		std::set<int>::iterator it = channel.clients.begin();
@@ -569,8 +562,7 @@ void Server::processPrivmsgCommand(int clientFd, const std::string &target, cons
 		return;
 	}
 
-	// Si target es usuario -> comprobar DCC (CTCP dentro del PRIVMSG)
-	// Nota: /dcc send del cliente se traduce en un PRIVMSG con CTCP: PRIVMSG nick :\001DCC SEND <file> <ip> <port> <size>\001
+	// DCC SEND <nickTarget> <file_path>
 	int dst_fd = findFdByNick(target);
 	if (dst_fd == -1)
 	{
@@ -578,23 +570,17 @@ void Server::processPrivmsgCommand(int clientFd, const std::string &target, cons
 		return;
 	}
 
-	// Si el texto comienza con 0x01 (CTCP) y contiene "DCC SEND " en la posición 1,
-	// lo consideramos una petición DCC SEND que podemos interceptar.
 	if (!text.empty() && text[0] == '\001')
 	{
 		const std::string dccPrefix = "DCC SEND ";
-		size_t pos = text.find(dccPrefix, 1); // buscar a partir de la posición 1 (tras \001)
+		size_t pos = text.find(dccPrefix, 1);
 		if (pos == 1)
 		{
-			// Delegate toda la lógica DCC / FileTransfer a la función auxiliar.
-			// La función devuelve true si se interceptó y manejó (incluye todos los fallbacks/NOTICEs)
 			if (handleDccSend(clientFd, dst_fd, text, prefix, target))
-				return; // ya manejado (interceptado o fallback)
+				return;
 		}
 	}
 
-	// Si no era un DCC SEND o el parse falló -> reenviar PRIVMSG clásico al destinatario
-	// Pero antes, si el bot respondió (y no era CTCP), enviamos la respuesta del bot al destinatario
 	if (!botReply.empty() && !isCTCP)
 	{
 		std::string botOut = ":" + _bot.getName() + "!bot@localhost PRIVMSG " + target + " :" + botReply;

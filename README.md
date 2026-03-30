@@ -106,7 +106,7 @@ nc <IP_address> <port>
 ```
 #### Using irssi:
 ```bash
-irssi -c <ip_address> -p <port>
+irssi -c <IP_address> -p <port>
 ```
 - `IP_address`: The IP address of the host running the server.
 - `port`: The port on which the server is listening.
